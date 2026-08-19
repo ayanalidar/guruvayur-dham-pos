@@ -57,3 +57,4 @@ next-env.d.ts
 /dev.log
 /dev.pid
 .env*
+.env.local

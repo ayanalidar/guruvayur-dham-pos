@@ -1,12 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "prisma generate && bun run build",
+  "buildCommand": "prisma generate && bun run db:push && bun run build",
   "installCommand": "bun install",
   "regions": ["bom1"],
-  "env": {
-    "DATABASE_URL": "file:/tmp/gvd-pos.db"
-  },
   "headers": [
     {
       "source": "/sw.js",

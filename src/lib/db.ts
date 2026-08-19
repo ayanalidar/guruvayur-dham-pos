@@ -1,10 +1,8 @@
 import { PrismaClient } from '@prisma/client'
-import { SCHEMA_SQL } from './schema-sql'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
   prismaSeeded: boolean | undefined
-  schemaPushed: boolean | undefined
 }
 
 // Always create a fresh client in dev to avoid stale file handles when the DB file is reset
@@ -19,57 +17,11 @@ export const db = process.env.NODE_ENV === 'production'
   ? (globalForPrisma.prisma ?? (globalForPrisma.prisma = createClient()))
   : createClient()
 
-// On Vercel (serverless), the SQLite file is ephemeral — it resets on each cold start.
-// This function ensures the DB schema exists AND is seeded on first use.
-// The schema SQL is embedded in the JS bundle (src/lib/schema-sql.ts) so it's always available.
+// Schema is created at build time via `prisma db push` (see vercel.json buildCommand).
+// This function only ensures the seed data (hotel config, rooms, menu items) is present.
+// On Postgres (Neon), data persists across cold starts — so seeding only happens once per DB.
 export async function ensureSeeded() {
   if (globalForPrisma.prismaSeeded) return
-
-  // Step 1: Ensure the SQLite schema exists in the DB file.
-  if (!globalForPrisma.schemaPushed) {
-    let tableExists = false
-    try {
-      const result = await db.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='HotelConfig'` as any[]
-      tableExists = result && result.length > 0
-    } catch {
-      tableExists = false
-    }
-
-    if (!tableExists) {
-      try {
-        // Split SQL into individual statements.
-        // The schema.sql has comments like "-- CreateTable" before each CREATE statement,
-        // with statements separated by ";\n\n-- Create...".
-        // We split on ";\n\n" (semicolon + blank line) to keep multi-line CREATE TABLE statements intact,
-        // then strip leading comment lines from each statement.
-        const statements = SCHEMA_SQL
-          .split(/;\s*\n\s*\n/)
-          .map(s => s.trim())
-          .filter(s => s)
-          // Strip leading comment lines (lines starting with --)
-          .map(s => {
-            const lines = s.split('\n').filter(l => !l.trim().startsWith('--'))
-            return lines.join('\n').trim()
-          })
-          .filter(s => s) // remove any that became empty after stripping comments
-          // Append the semicolon back
-          .map(s => s.endsWith(';') ? s : s + ';')
-        console.log('[seed] executing ' + statements.length + ' SQL statements')
-        for (const stmt of statements) {
-          try {
-            await db.$executeRawUnsafe(stmt)
-          } catch (e) {
-            console.warn('[seed] statement failed (continuing):', (e as Error).message?.substring(0, 100))
-          }
-        }
-        console.log('[seed] schema created via raw SQL')
-      } catch (e) {
-        console.error('[seed] schema creation failed:', e)
-      }
-    }
-    globalForPrisma.schemaPushed = true
-  }
-
   globalForPrisma.prismaSeeded = true
 
   try {
