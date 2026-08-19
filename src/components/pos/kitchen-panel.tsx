@@ -177,7 +177,7 @@ function OrderTab() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] gap-4 max-w-full">
       {/* Left: menu */}
       <div className="space-y-3">
         <div className="flex flex-wrap gap-2">

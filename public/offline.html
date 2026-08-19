@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline — Hotel Guruvayur Dham POS</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      background: linear-gradient(135deg, #FFFBF5 0%, #FFF5E6 100%);
+      color: #B22222;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      overscroll-behavior: none;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      box-shadow: 0 10px 40px rgba(178, 34, 34, 0.15);
+      text-align: center;
+      max-width: 400px;
+      width: 100%;
+    }
+    img { width: 96px; height: 64px; object-fit: contain; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #B22222; }
+    p { color: #666; font-size: 0.95rem; margin-bottom: 1.5rem; font-family: Arial, sans-serif; }
+    button {
+      background: #B22222;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+      transition: background 0.2s;
+    }
+    button:hover { background: #8B0000; }
+    .hint { font-size: 0.75rem; color: #999; margin-top: 1rem; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/gvd-logo.webp" alt="GVD">
+    <h1>You're Offline</h1>
+    <p>The POS can't reach the server right now. Please check your internet connection and try again.</p>
+    <button onclick="location.reload()">Retry Connection</button>
+    <p class="hint">Hotel Guruvayur Dham · Mathura</p>
+  </div>
+</body>
+</html>

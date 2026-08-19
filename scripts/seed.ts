@@ -22,6 +22,11 @@ async function main() {
       cgstRate: 9.0,
       sgstRate: 9.0,
       posPin: '1234',
+      reviewLink: 'https://share.google/5fv3gDrquFN8LT1xb',
+      bankName: 'AU Small Finance Bank',
+      bankAccount: '2502423717165310',
+      bankIfsc: 'AUBL0002453',
+      bankBranch: 'Mathura',
     },
     create: {
       id: 'main',
@@ -34,6 +39,11 @@ async function main() {
       cgstRate: 9.0,
       sgstRate: 9.0,
       posPin: '1234',
+      reviewLink: 'https://share.google/5fv3gDrquFN8LT1xb',
+      bankName: 'AU Small Finance Bank',
+      bankAccount: '2502423717165310',
+      bankIfsc: 'AUBL0002453',
+      bankBranch: 'Mathura',
     },
   })
   console.log('✓ Hotel config (updated with real Mathura UP details)')

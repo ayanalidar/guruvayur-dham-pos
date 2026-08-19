@@ -23,21 +23,40 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({ invoice })
 }
 
-// PATCH /api/invoices/hotel/[id] — update editable fields (invoiceNumber, paymentMethod, notes)
+// PATCH /api/invoices/hotel/[id] — update any editable field on the hotel invoice
+// All fields are optional; only provided ones are updated.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json()
+
   const data: Record<string, unknown> = {}
-  if (body.invoiceNumber != null) {
-    const num = String(body.invoiceNumber).trim()
-    if (!num) return NextResponse.json({ error: 'invoiceNumber cannot be empty' }, { status: 400 })
-    // ensure uniqueness
-    const exists = await db.hotelInvoice.findFirst({ where: { invoiceNumber: num, NOT: { id } } })
-    if (exists) return NextResponse.json({ error: 'Invoice number already exists' }, { status: 400 })
-    data.invoiceNumber = num
+
+  // String fields
+  const strFields = ['invoiceNumber', 'guestName', 'guestPhone', 'roomNumber', 'roomType', 'paymentMethod', 'notes']
+  for (const k of strFields) {
+    if (body[k] != null) {
+      if (k === 'invoiceNumber') {
+        const num = String(body[k]).trim()
+        if (!num) return NextResponse.json({ error: 'invoiceNumber cannot be empty' }, { status: 400 })
+        const exists = await db.hotelInvoice.findFirst({ where: { invoiceNumber: num, NOT: { id } } })
+        if (exists) return NextResponse.json({ error: 'Invoice number already exists' }, { status: 400 })
+        data.invoiceNumber = num
+      } else {
+        data[k] = String(body[k])
+      }
+    }
   }
-  if (body.paymentMethod != null) data.paymentMethod = body.paymentMethod
-  if (body.notes != null) data.notes = body.notes
+
+  // Numeric fields
+  const numFields = ['nights', 'ratePerNight', 'roomCharges', 'foodCharges', 'extraCharges', 'discount', 'taxableAmount', 'cgstRate', 'sgstRate', 'cgstAmount', 'sgstAmount', 'grandTotal', 'advancePaid', 'balanceDue']
+  for (const k of numFields) {
+    if (body[k] != null) data[k] = Number(body[k])
+  }
+
+  // Date fields
+  if (body.checkInAt != null) data.checkInAt = new Date(body.checkInAt)
+  if (body.checkOutAt != null) data.checkOutAt = new Date(body.checkOutAt)
+
   if (Object.keys(data).length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
   const invoice = await db.hotelInvoice.update({ where: { id }, data: data as any })

@@ -15,3 +15,4 @@ function createClient() {
 export const db = process.env.NODE_ENV === 'production'
   ? (globalForPrisma.prisma ?? (globalForPrisma.prisma = createClient()))
   : createClient()// touched at Wed Aug 19 07:37:19 UTC 2026
+// touched at Wed Aug 19 18:08:52 UTC 2026

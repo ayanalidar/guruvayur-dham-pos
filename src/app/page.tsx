@@ -213,6 +213,30 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               onChange={e => setConfig({ ...config, posPin: e.target.value.replace(/\D/g, '') })}
             />
           </FieldRow>
+          <FieldRow label="Google Review Link (shared via WhatsApp)">
+            <Input
+              type="url"
+              value={config.reviewLink ?? ''}
+              placeholder="https://share.google/..."
+              onChange={e => setConfig({ ...config, reviewLink: e.target.value })}
+            />
+          </FieldRow>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Bank Name">
+              <Input value={config.bankName ?? ''} onChange={e => setConfig({ ...config, bankName: e.target.value })} />
+            </FieldRow>
+            <FieldRow label="Account Number">
+              <Input value={config.bankAccount ?? ''} onChange={e => setConfig({ ...config, bankAccount: e.target.value })} />
+            </FieldRow>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="IFSC Code">
+              <Input value={config.bankIfsc ?? ''} onChange={e => setConfig({ ...config, bankIfsc: e.target.value })} />
+            </FieldRow>
+            <FieldRow label="Branch">
+              <Input value={config.bankBranch ?? ''} onChange={e => setConfig({ ...config, bankBranch: e.target.value })} />
+            </FieldRow>
+          </div>
         </div>
 
         <DialogFooter>

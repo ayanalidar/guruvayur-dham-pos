@@ -13,7 +13,7 @@ export async function GET() {
 // PATCH /api/config — update hotel config (including posPin)
 export async function PATCH(req: NextRequest) {
   const body = await req.json()
-  const allowed = ['name', 'address', 'phone', 'email', 'gstNumber', 'sacCode', 'cgstRate', 'sgstRate', 'posPin']
+  const allowed = ['name', 'address', 'phone', 'email', 'gstNumber', 'sacCode', 'cgstRate', 'sgstRate', 'posPin', 'reviewLink', 'bankName', 'bankAccount', 'bankIfsc', 'bankBranch']
   const data: Record<string, unknown> = {}
   for (const k of allowed) {
     if (body[k] != null) {
