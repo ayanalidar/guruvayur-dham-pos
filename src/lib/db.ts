@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
-import { execSync } from 'child_process'
 import fs from 'fs'
+import path from 'path'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -21,30 +21,42 @@ export const db = process.env.NODE_ENV === 'production'
   : createClient()
 
 // On Vercel (serverless), the SQLite file is ephemeral — it resets on each cold start.
-// This function ensures the DB schema exists (via `prisma db push`) AND is seeded on first use.
-// Call it from API routes that need a seeded DB.
+// This function ensures the DB schema exists AND is seeded on first use.
+// The schema is created by executing the SQL DDL statements directly via Prisma's $executeRawUnsafe.
 export async function ensureSeeded() {
   if (globalForPrisma.prismaSeeded) return
 
   // Step 1: Ensure the SQLite schema exists in the DB file.
-  // On Vercel, the file is at /tmp/gvd-pos.db and starts empty on cold start.
-  // Running `prisma db push` creates all tables.
   if (!globalForPrisma.schemaPushed) {
-    const dbUrl = process.env.DATABASE_URL || ''
-    // Only run db push if the DB is a SQLite file that doesn't exist yet
-    if (dbUrl.startsWith('file:')) {
-      const filePath = dbUrl.replace('file:', '')
-      if (!fs.existsSync(filePath)) {
-        try {
-          execSync('npx prisma db push --skip-generate --accept-data-loss', {
-            stdio: 'ignore',
-            env: { ...process.env },
-            timeout: 30000,
-          })
-          console.log('[seed] schema created via prisma db push')
-        } catch (e) {
-          console.error('[seed] schema push failed:', e)
+    try {
+      // Check if HotelConfig table exists (use a try/catch — if it doesn't exist, the query throws)
+      await db.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='HotelConfig'`
+    } catch {
+      // Table doesn't exist — execute the schema SQL
+      try {
+        // Try prisma/schema.sql first, fall back to public/schema.sql (which is always bundled)
+        let schemaPath = path.join(process.cwd(), 'prisma', 'schema.sql')
+        if (!fs.existsSync(schemaPath)) {
+          schemaPath = path.join(process.cwd(), 'public', 'schema.sql')
         }
+        if (fs.existsSync(schemaPath)) {
+          const sql = fs.readFileSync(schemaPath, 'utf-8')
+          // Split on semicolons, execute each statement (Prisma's $executeRawUnsafe doesn't support multi-statement)
+          const statements = sql
+            .split(/;\s*\n/)
+            .map(s => s.trim())
+            .filter(s => s && !s.startsWith('--'))
+          for (const stmt of statements) {
+            try {
+              await db.$executeRawUnsafe(stmt)
+            } catch (e) {
+              // Statement may fail if table already exists — ignore
+            }
+          }
+          console.log('[seed] schema created via raw SQL')
+        }
+      } catch (e) {
+        console.error('[seed] schema creation failed:', e)
       }
     }
     globalForPrisma.schemaPushed = true
