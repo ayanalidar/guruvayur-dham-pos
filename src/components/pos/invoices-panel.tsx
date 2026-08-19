@@ -4,12 +4,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus } from 'lucide-react'
+import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, apiFetch } from '@/lib/format'
+import { GuardianXBrand } from './guardianx-brand'
 
 type HotelInvoice = {
   id: string; invoiceNumber: string; guestName: string; guestPhone: string
@@ -91,6 +93,13 @@ function HotelInvoicesTab() {
     })()
     return () => { active = false }
   }, [toast])
+
+  // Refresh when an invoice is updated (e.g., number edited in dialog)
+  useEffect(() => {
+    function onUpdated() { load() }
+    window.addEventListener('invoice-updated', onUpdated)
+    return () => window.removeEventListener('invoice-updated', onUpdated)
+  }, [load])
 
   async function view(id: string) {
     try {
@@ -180,6 +189,13 @@ function FoodInvoicesTab() {
     return () => { active = false }
   }, [toast])
 
+  // Refresh when an invoice is updated
+  useEffect(() => {
+    function onUpdated() { load() }
+    window.addEventListener('invoice-updated', onUpdated)
+    return () => window.removeEventListener('invoice-updated', onUpdated)
+  }, [load])
+
   async function view(id: string) {
     try {
       const d = await apiFetch<{ invoice: FoodInvoice }>(`/api/invoices/food/${id}`)
@@ -243,14 +259,51 @@ function FoodInvoicesTab() {
 
 function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null; onClose: () => void }) {
   const [config, setConfig] = useState<Config | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editedNumber, setEditedNumber] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     apiFetch<{ config: Config }>('/api/config').then(d => setConfig(d.config)).catch(() => {})
   }, [])
 
+  // Reset edit state whenever a new invoice is opened
+  useEffect(() => {
+    if (invoice) {
+      setEditMode(false)
+      setEditedNumber(invoice.invoiceNumber)
+    }
+  }, [invoice?.id])
+
   if (!invoice) return null
 
   const foodOrders = invoice.checkIn?.foodOrders || []
+
+  async function saveInvoiceNumber() {
+    if (!invoice) return
+    const trimmed = editedNumber.trim()
+    if (!trimmed) return
+    if (trimmed === invoice.invoiceNumber) { setEditMode(false); return }
+    setSaving(true)
+    try {
+      const r = await apiFetch<{ invoice: HotelInvoice }>(`/api/invoices/hotel/${invoice.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ invoiceNumber: trimmed }),
+      })
+      // mutate local state (so UI updates without refetch)
+      Object.assign(invoice, { invoiceNumber: r.invoice.invoiceNumber })
+      setEditMode(false)
+      // refresh the parent list by triggering reload via onClose + reopen
+      // simpler: just trigger a window event
+      window.dispatchEvent(new CustomEvent('invoice-updated'))
+    } catch (e: any) {
+      // toast via parent — for now just alert
+      setEditedNumber(invoice.invoiceNumber)
+      setEditMode(false)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
@@ -262,7 +315,17 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
         </DialogHeader>
 
         <div className="invoice-print">
-          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="HOTEL INVOICE" />
+          <InvoiceHeader
+            config={config}
+            invoiceNumber={invoice.invoiceNumber}
+            title="HOTEL INVOICE"
+            editableNumber={editMode ? editedNumber : null}
+            onNumberChange={setEditedNumber}
+            onSaveNumber={saveInvoiceNumber}
+            onCancelEdit={() => { setEditMode(false); setEditedNumber(invoice.invoiceNumber) }}
+            onEditClick={() => setEditMode(true)}
+            savingNumber={saving}
+          />
 
           <div className="grid grid-cols-2 gap-3 text-sm mt-4 mb-4">
             <div>
@@ -364,12 +427,44 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
 function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; onClose: () => void }) {
   const [config, setConfig] = useState<Config | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editedNumber, setEditedNumber] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     apiFetch<{ config: Config }>('/api/config').then(d => setConfig(d.config)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (invoice) {
+      setEditMode(false)
+      setEditedNumber(invoice.invoiceNumber)
+    }
+  }, [invoice?.id])
+
   if (!invoice) return null
+
+  async function saveInvoiceNumber() {
+    if (!invoice) return
+    const trimmed = editedNumber.trim()
+    if (!trimmed) return
+    if (trimmed === invoice.invoiceNumber) { setEditMode(false); return }
+    setSaving(true)
+    try {
+      const r = await apiFetch<{ invoice: FoodInvoice }>(`/api/invoices/food/${invoice.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ invoiceNumber: trimmed }),
+      })
+      Object.assign(invoice, { invoiceNumber: r.invoice.invoiceNumber })
+      setEditMode(false)
+      window.dispatchEvent(new CustomEvent('invoice-updated'))
+    } catch (e: any) {
+      setEditedNumber(invoice.invoiceNumber)
+      setEditMode(false)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
@@ -381,7 +476,17 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
         </DialogHeader>
 
         <div className="invoice-print">
-          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="FOOD INVOICE" />
+          <InvoiceHeader
+            config={config}
+            invoiceNumber={invoice.invoiceNumber}
+            title="FOOD INVOICE"
+            editableNumber={editMode ? editedNumber : null}
+            onNumberChange={setEditedNumber}
+            onSaveNumber={saveInvoiceNumber}
+            onCancelEdit={() => { setEditMode(false); setEditedNumber(invoice.invoiceNumber) }}
+            onEditClick={() => setEditMode(true)}
+            savingNumber={saving}
+          />
 
           <div className="grid grid-cols-2 gap-3 text-sm mt-4 mb-4">
             <div>
@@ -449,7 +554,19 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
 // ----- shared invoice bits -----
 
-function InvoiceHeader({ config, invoiceNumber, title }: { config: Config | null; invoiceNumber: string; title: string }) {
+function InvoiceHeader({
+  config, invoiceNumber, title,
+  editableNumber = null,
+  onNumberChange, onSaveNumber, onCancelEdit, onEditClick, savingNumber = false,
+}: {
+  config: Config | null; invoiceNumber: string; title: string
+  editableNumber?: string | null
+  onNumberChange?: (v: string) => void
+  onSaveNumber?: () => void
+  onCancelEdit?: () => void
+  onEditClick?: () => void
+  savingNumber?: boolean
+}) {
   return (
     <div className="border-b-2 border-primary pb-3 mb-3">
       <div className="flex items-start justify-between gap-3">
@@ -464,7 +581,41 @@ function InvoiceHeader({ config, invoiceNumber, title }: { config: Config | null
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-bold uppercase tracking-wider">{title}</p>
-          <p className="font-mono text-sm font-semibold mt-1">{invoiceNumber}</p>
+          {editableNumber !== null ? (
+            <div className="mt-1 flex items-center gap-1 no-print">
+              <Input
+                value={editableNumber}
+                onChange={e => onNumberChange?.(e.target.value)}
+                className="h-7 text-xs font-mono w-36"
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') onSaveNumber?.()
+                  if (e.key === 'Escape') onCancelEdit?.()
+                }}
+              />
+              <Button size="icon" variant="default" className="h-6 w-6" onClick={onSaveNumber} disabled={savingNumber}>
+                <CheckCircle2 className="h-3 w-3" />
+              </Button>
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onCancelEdit} disabled={savingNumber}>
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-1 flex items-center justify-end gap-1 group">
+              <p className="font-mono text-sm font-semibold">{invoiceNumber}</p>
+              {onEditClick && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5 opacity-0 group-hover:opacity-100 no-print"
+                  onClick={onEditClick}
+                  title="Edit invoice number"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -493,6 +644,11 @@ function InvoiceFooter({ config, sacCode }: { config: Config | null; sacCode: st
       {config?.email && <p>{config.email}</p>}
       {sacCode && <p className="mt-1">SAC Code: {sacCode}</p>}
       <p className="mt-2 text-[10px] italic">This is a computer-generated invoice and is valid without signature.</p>
+      <div className="mt-3 pt-2 border-t border-dashed flex items-center justify-center gap-1 text-[10px]">
+        <Shield className="h-3 w-3" />
+        <span>Made &amp; Maintained by</span>
+        <strong className="font-semibold">GuardianX</strong>
+      </div>
     </div>
   )
 }

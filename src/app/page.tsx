@@ -1,21 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DashboardPanel } from '@/components/pos/dashboard-panel'
 import { RoomsPanel } from '@/components/pos/rooms-panel'
 import { KitchenPanel } from '@/components/pos/kitchen-panel'
 import { OrdersPanel } from '@/components/pos/orders-panel'
 import { InvoicesPanel } from '@/components/pos/invoices-panel'
+import { LoginScreen } from '@/components/pos/login-screen'
+import { GuardianXBrand } from '@/components/pos/guardianx-brand'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Hotel, Settings } from 'lucide-react'
+import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Hotel, Settings, LogOut } from 'lucide-react'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { apiFetch } from '@/lib/format'
-import { useEffect } from 'react'
 
 type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices'
 
@@ -30,6 +31,24 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
 export default function Home() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Lazy initialiser reads sessionStorage once on first render (client-side)
+  // — no flash, no extra render, no eslint warning.
+  const [authed, setAuthed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return sessionStorage.getItem('posAuth') === 'true'
+  })
+
+  function handleLogin() {
+    setAuthed(true)
+  }
+
+  function handleLogout() {
+    sessionStorage.removeItem('posAuth')
+    sessionStorage.removeItem('posAuthAt')
+    setAuthed(false)
+  }
+
+  if (!authed) return <LoginScreen onSuccess={handleLogin} />
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -65,7 +84,7 @@ export default function Home() {
           ))}
         </nav>
 
-        <div className="p-2 border-t border-sidebar-border">
+        <div className="p-2 border-t border-sidebar-border space-y-2">
           <Button
             variant="ghost"
             size="sm"
@@ -75,6 +94,19 @@ export default function Home() {
             <Settings className="h-4 w-4" />
             <span className="hidden lg:inline ml-2">Settings</span>
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="w-full justify-start text-sidebar-foreground/80 hover:bg-rose-500/20 hover:text-rose-300"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden lg:inline ml-2">Lock POS</span>
+          </Button>
+          {/* GuardianX brand at bottom of sidebar */}
+          <div className="hidden lg:block pt-2 border-t border-sidebar-border/50">
+            <GuardianXBrand variant="dark" />
+          </div>
         </div>
       </aside>
 
@@ -164,6 +196,15 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               <Input type="number" step="0.1" value={config.sgstRate ?? 9} onChange={e => setConfig({ ...config, sgstRate: Number(e.target.value) })} />
             </FieldRow>
           </div>
+          <FieldRow label="POS Login PIN (4-6 digits)">
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={config.posPin ?? '1234'}
+              onChange={e => setConfig({ ...config, posPin: e.target.value.replace(/\D/g, '') })}
+            />
+          </FieldRow>
         </div>
 
         <DialogFooter>

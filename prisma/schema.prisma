@@ -20,6 +20,7 @@ model HotelConfig {
   sacCode       String   @default("")
   cgstRate      Float    @default(9.0)
   sgstRate      Float    @default(9.0)
+  posPin        String   @default("1234") // 4-digit PIN for POS login
   updatedAt     DateTime @updatedAt
 }
 

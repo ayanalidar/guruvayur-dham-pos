@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Plus, Minus, Trash2, ShoppingCart, Utensils, Search, Leaf, Drumstick, CheckCircle2, X } from 'lucide-react'
+import { Plus, Minus, Trash2, ShoppingCart, Utensils, Search, Leaf, Drumstick, CheckCircle2, X, Pencil } from 'lucide-react'
 import { formatINR, apiFetch } from '@/lib/format'
 
 type MenuItem = {
@@ -353,6 +354,10 @@ function MenuTab() {
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [newItem, setNewItem] = useState({ name: '', category: 'Main Course', price: 100, isVeg: true, prepTime: 15 })
+  const [editing, setEditing] = useState<MenuItem | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', category: 'Main Course', price: 100, isVeg: true, prepTime: 15, description: '' })
+  const [deleting, setDeleting] = useState<MenuItem | null>(null)
+  const [deleteResult, setDeleteResult] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -418,6 +423,57 @@ function MenuTab() {
     }
   }
 
+  function openEdit(m: MenuItem) {
+    setEditing(m)
+    setEditForm({
+      name: m.name, category: m.category, price: m.price, isVeg: m.isVeg,
+      prepTime: m.prepTime, description: m.description || '',
+    })
+  }
+
+  async function saveEdit() {
+    if (!editing) return
+    if (!editForm.name.trim() || editForm.price <= 0) {
+      toast({ title: 'Name and valid price required', variant: 'destructive' }); return
+    }
+    try {
+      await apiFetch('/api/menu', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          id: editing.id,
+          name: editForm.name.trim(),
+          category: editForm.category,
+          price: Number(editForm.price),
+          isVeg: editForm.isVeg,
+          prepTime: Number(editForm.prepTime),
+          description: editForm.description || null,
+        }),
+      })
+      toast({ title: `Updated ${editForm.name}` })
+      setEditing(null)
+      load()
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return
+    try {
+      const r = await apiFetch<{ deleted?: boolean; softDeleted?: boolean; message?: string }>(`/api/menu/${deleting.id}`, { method: 'DELETE' })
+      if (r.softDeleted) {
+        setDeleteResult(r.message || 'Item was referenced in past orders — marked as unavailable instead.')
+        toast({ title: 'Marked as unavailable', description: r.message })
+      } else {
+        toast({ title: `Deleted ${deleting.name}` })
+        setDeleting(null); setDeleteResult(null)
+      }
+      load()
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' })
+    }
+  }
+
   const filtered = menu.filter(m => !search || m.name.toLowerCase().includes(search.toLowerCase()))
 
   // group by category
@@ -463,7 +519,7 @@ function MenuTab() {
             <h3 className="text-sm font-semibold mb-2">{cat} <span className="text-xs text-muted-foreground">({items.length})</span></h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
               {items.map(m => (
-                <div key={m.id} className="rounded-md border p-2.5 text-sm flex items-center gap-2">
+                <div key={m.id} className="rounded-md border p-2.5 text-sm flex items-center gap-2 group">
                   <span className={`inline-flex items-center justify-center w-4 h-4 rounded-sm border ${m.isVeg ? 'border-emerald-500' : 'border-rose-500'}`}>
                     {m.isVeg ? <Leaf className="h-2.5 w-2.5 text-emerald-500" /> : <Drumstick className="h-2.5 w-2.5 text-rose-500" />}
                   </span>
@@ -477,8 +533,14 @@ function MenuTab() {
                     onBlur={e => { const v = Number(e.target.value); if (v !== m.price && v > 0) updatePrice(m, v) }}
                     className="w-20 h-7 text-xs"
                   />
-                  <Button size="icon" variant={m.available ? 'default' : 'outline'} className="h-7 w-7" onClick={() => toggleAvailable(m)}>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 opacity-60 hover:opacity-100" onClick={() => openEdit(m)} title="Edit">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant={m.available ? 'default' : 'outline'} className="h-7 w-7" onClick={() => toggleAvailable(m)} title={m.available ? 'Available' : 'Unavailable'}>
                     {m.available ? <CheckCircle2 className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-60 hover:opacity-100" onClick={() => { setDeleting(m); setDeleteResult(null) }} title="Delete">
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               ))}
@@ -486,6 +548,70 @@ function MenuTab() {
           </div>
         ))}
       </CardContent>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editing} onOpenChange={(v) => !v && setEditing(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Menu Item</DialogTitle>
+            <DialogDescription>Update name, category, price, veg/non-veg, prep time, or description.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Field label="Name"><Input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Category">
+                <Select value={editForm.category} onValueChange={v => setEditForm({ ...editForm, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {['Breakfast','South Indian','Main Course','Breads','Rice','Chinese','Starters','Beverages','Desserts'].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Price (₹)"><Input type="number" value={editForm.price} onChange={e => setEditForm({ ...editForm, price: Number(e.target.value) })} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Veg?">
+                <div className="flex items-center gap-2 h-9">
+                  <Switch checked={editForm.isVeg} onCheckedChange={(v) => setEditForm({ ...editForm, isVeg: v })} />
+                  <span className="text-xs">{editForm.isVeg ? 'Veg' : 'Non-Veg'}</span>
+                </div>
+              </Field>
+              <Field label="Prep Time (min)"><Input type="number" value={editForm.prepTime} onChange={e => setEditForm({ ...editForm, prepTime: Number(e.target.value) })} /></Field>
+            </div>
+            <Field label="Description">
+              <Textarea rows={2} value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button onClick={saveEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <Dialog open={!!deleting} onOpenChange={(v) => { if (!v) { setDeleting(null); setDeleteResult(null) } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-4 w-4" /> Delete Menu Item
+            </DialogTitle>
+            <DialogDescription>
+              {deleteResult
+                ? deleteResult
+                : <>Are you sure you want to delete <strong>{deleting?.name}</strong>? This action cannot be undone if the item has never been ordered.</>}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            {deleteResult
+              ? <Button onClick={() => { setDeleting(null); setDeleteResult(null) }}>Close</Button>
+              : <>
+                  <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
+                  <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                </>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
