@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Bed, Utensils, Receipt, TrendingUp, Clock, AlertCircle } from 'lucide-react'
 import { formatINR, formatDateShort, timeAgo, apiFetch } from '@/lib/format'
+import { DashboardCharts } from './dashboard-charts'
 
 type DashboardData = {
   rooms: { total: number; occupied: number; available: number; cleaning: number; maintenance: number }
@@ -98,6 +99,9 @@ export function DashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
           </Button>
         </CardContent>
       </Card>
+
+      {/* Charts — revenue trend, occupancy, top items */}
+      <DashboardCharts />
 
       {/* Recent invoices */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

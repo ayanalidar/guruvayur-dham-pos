@@ -88,6 +88,64 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
     }
   }
 
+  // Print KOT — opens a kitchen-only ticket (no prices) in a new window for printing.
+  async function printKOT(order: FoodOrder) {
+    try {
+      const r = await apiFetch<{ kot: any }>(`/api/orders/${order.id}/kot`)
+      const kot = r.kot
+      // Open a new window with the KOT HTML and trigger print
+      const win = window.open('', '_blank', 'width=400,height=600')
+      if (!win) {
+        toast({ title: 'Popup blocked', description: 'Please allow popups to print KOT', variant: 'destructive' })
+        return
+      }
+      const itemsHTML = kot.items.map((it: any, i: number) => `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px dashed #999;font-weight:bold;width:30px;text-align:center;">${it.quantity}×</td>
+          <td style="padding:6px 8px;border-bottom:1px dashed #999;">${it.name}${it.notes ? `<br><small style="color:#666">Note: ${it.notes}</small>` : ''}</td>
+        </tr>
+      `).join('')
+      win.document.write(`
+        <!DOCTYPE html><html><head><title>KOT ${kot.orderNumber}</title>
+        <style>
+          body { font-family: 'Courier New', monospace; padding: 16px; max-width: 300px; margin: 0 auto; }
+          h1 { text-align: center; color: #B22222; font-family: Georgia, serif; font-size: 18px; margin: 0 0 4px; }
+          .sub { text-align: center; font-size: 11px; color: #666; margin-bottom: 8px; }
+          .kot-title { text-align: center; font-weight: bold; font-size: 14px; padding: 6px; border: 1px dashed #000; margin: 8px 0; }
+          .meta { font-size: 12px; line-height: 1.5; margin: 6px 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+          .total { text-align: center; font-weight: bold; padding: 8px; border-top: 2px dashed #000; margin-top: 8px; }
+          .footer { text-align: center; font-size: 10px; color: #888; margin-top: 16px; }
+          @media print { body { max-width: none; } }
+        </style></head><body>
+          <h1>HOTEL GURUVAYUR DHAM</h1>
+          <p class="sub">Mathura, Uttar Pradesh</p>
+          <div class="kot-title">🔴 KITCHEN ORDER TICKET 🔴</div>
+          <div class="meta">
+            <strong>Order:</strong> ${kot.orderNumber}<br>
+            <strong>Time:</strong> ${new Date(kot.createdAt).toLocaleString('en-IN')}<br>
+            <strong>Type:</strong> ${kot.orderType.replace('_', ' ').toUpperCase()}<br>
+            <strong>Customer:</strong> ${kot.customerName}<br>
+            ${kot.roomNumber ? `<strong>Room:</strong> ${kot.roomNumber}<br>` : ''}
+            ${kot.tableNumber ? `<strong>Table:</strong> ${kot.tableNumber}<br>` : ''}
+            <strong>Items:</strong> ${kot.itemCount}
+          </div>
+          <table>
+            <thead><tr style="border-bottom:2px solid #000;"><th style="padding:4px 8px;text-align:left;">Qty</th><th style="padding:4px 8px;text-align:left;">Item</th></tr></thead>
+            <tbody>${itemsHTML}</tbody>
+          </table>
+          ${kot.notes ? `<div style="padding:8px;border:1px dashed #B22222;background:#FFF5F5;margin-top:8px;font-size:12px;"><strong>Special Note:</strong> ${kot.notes}</div>` : ''}
+          <div class="total">${kot.itemCount} ITEMS — PREPARE NOW</div>
+          <div class="footer">KOT — no prices shown · GuardianX POS</div>
+        </body></html>
+      `)
+      win.document.close()
+      setTimeout(() => { win.focus(); win.print() }, 250)
+    } catch (e: any) {
+      toast({ title: 'Failed to generate KOT', description: e.message, variant: 'destructive' })
+    }
+  }
+
   const filtered = orders.filter(o => {
     if (filter === 'active') return ['pending', 'preparing', 'ready'].includes(o.status)
     if (filter === 'served') return o.status === 'served'
@@ -131,6 +189,7 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
               onStatus={updateStatus}
               onNavigate={onNavigate}
               onCreateFoodInvoice={createFoodInvoice}
+              onPrintKOT={printKOT}
             />
           ))}
         </div>
@@ -139,11 +198,12 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
   )
 }
 
-function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice }: {
+function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKOT }: {
   order: FoodOrder
   onStatus: (o: FoodOrder, s: string) => void
   onNavigate?: (t: string) => void
   onCreateFoodInvoice?: (o: FoodOrder) => void
+  onPrintKOT?: (o: FoodOrder) => void
 }) {
   const statusCfg: Record<string, { cls: string; icon: React.ReactNode }> = {
     pending:   { cls: 'bg-amber-100 text-amber-800 border-amber-200', icon: <Clock className="h-3 w-3" /> },
@@ -199,17 +259,23 @@ function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice }: {
 
         <div className="mt-3 pt-3 border-t flex items-center justify-between">
           <span className="text-sm font-semibold">{formatINR(order.grandTotal)}</span>
-          {order.paymentMode === 'separate' && (
-            order.foodInvoice ? (
-              <Badge variant="secondary" className="text-xs">
-                <Receipt className="h-3 w-3 mr-1" /> {order.foodInvoice.invoiceNumber}
-              </Badge>
-            ) : order.status === 'served' ? (
-              <Button size="sm" variant="outline" onClick={() => onCreateFoodInvoice?.(order)}>
-                <Receipt className="h-3 w-3 mr-1" /> Generate Food Invoice
-              </Button>
-            ) : null
-          )}
+          <div className="flex items-center gap-1">
+            {/* KOT print button — for kitchen only, no prices */}
+            <Button size="sm" variant="ghost" onClick={() => onPrintKOT?.(order)} title="Print Kitchen Order Ticket (KOT)">
+              <ChefHat className="h-3.5 w-3.5" />
+            </Button>
+            {order.paymentMode === 'separate' && (
+              order.foodInvoice ? (
+                <Badge variant="secondary" className="text-xs">
+                  <Receipt className="h-3 w-3 mr-1" /> {order.foodInvoice.invoiceNumber}
+                </Badge>
+              ) : order.status === 'served' ? (
+                <Button size="sm" variant="outline" onClick={() => onCreateFoodInvoice?.(order)}>
+                  <Receipt className="h-3 w-3 mr-1" /> Invoice
+                </Button>
+              ) : null
+            )}
+          </div>
         </div>
 
         {/* Status progression buttons */}

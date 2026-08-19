@@ -7,10 +7,12 @@ import { KitchenPanel } from '@/components/pos/kitchen-panel'
 import { OrdersPanel } from '@/components/pos/orders-panel'
 import { InvoicesPanel } from '@/components/pos/invoices-panel'
 import { GuestsPanel } from '@/components/pos/guests-panel'
+import { ReportsPanel } from '@/components/pos/reports-panel'
+import { ReservationsPanel } from '@/components/pos/reservations-panel'
 import { LoginScreen } from '@/components/pos/login-screen'
 import { GuardianXBrand } from '@/components/pos/guardianx-brand'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut, Users } from 'lucide-react'
+import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut, Users, BarChart3, CalendarClock } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -19,15 +21,17 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { apiFetch } from '@/lib/format'
 
-type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices' | 'guests'
+type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices' | 'guests' | 'reservations' | 'reports'
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { id: 'rooms',     label: 'Rooms',     icon: <Bed className="h-4 w-4" /> },
-  { id: 'kitchen',   label: 'Kitchen',   icon: <Utensils className="h-4 w-4" /> },
-  { id: 'orders',    label: 'Orders',    icon: <ClipboardList className="h-4 w-4" /> },
-  { id: 'invoices',  label: 'Invoices',  icon: <Receipt className="h-4 w-4" /> },
-  { id: 'guests',    label: 'Guests',    icon: <Users className="h-4 w-4" /> },
+  { id: 'dashboard',    label: 'Dashboard',    icon: <LayoutDashboard className="h-4 w-4" /> },
+  { id: 'rooms',        label: 'Rooms',         icon: <Bed className="h-4 w-4" /> },
+  { id: 'kitchen',      label: 'Kitchen',       icon: <Utensils className="h-4 w-4" /> },
+  { id: 'orders',       label: 'Orders',        icon: <ClipboardList className="h-4 w-4" /> },
+  { id: 'invoices',      label: 'Invoices',      icon: <Receipt className="h-4 w-4" /> },
+  { id: 'guests',        label: 'Guests',        icon: <Users className="h-4 w-4" /> },
+  { id: 'reservations', label: 'Reservations', icon: <CalendarClock className="h-4 w-4" /> },
+  { id: 'reports',       label: 'Reports',       icon: <BarChart3 className="h-4 w-4" /> },
 ]
 
 export default function Home() {
@@ -133,7 +137,9 @@ export default function Home() {
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="h-14 border-b bg-card px-4 lg:px-6 flex items-center justify-between shrink-0">
           <div>
-            <h1 className="text-base lg:text-lg font-semibold capitalize">{tab === 'kitchen' ? 'Kitchen & Menu' : tab === 'guests' ? 'Customer Records' : tab}</h1>
+            <h1 className="text-base lg:text-lg font-semibold capitalize">
+              {tab === 'kitchen' ? 'Kitchen & Menu' : tab === 'guests' ? 'Customer Records' : tab === 'reports' ? 'Reports & Day-Close' : tab}
+            </h1>
           </div>
           <div className="text-xs text-muted-foreground">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
@@ -147,6 +153,8 @@ export default function Home() {
           {tab === 'orders' && <OrdersPanel onNavigate={(t) => setTab(t as Tab)} />}
           {tab === 'invoices' && <InvoicesPanel />}
           {tab === 'guests' && <GuestsPanel />}
+          {tab === 'reservations' && <ReservationsPanel />}
+          {tab === 'reports' && <ReportsPanel />}
         </div>
       </main>
 

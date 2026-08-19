@@ -43,6 +43,7 @@ model Room {
   status        String   @default("available") // available / occupied / cleaning / maintenance
   notes         String?
   checkIns      CheckIn[]
+  reservations  Reservation[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -184,4 +185,25 @@ model FoodInvoice {
   paymentMethod   String?
   notes           String?
   createdAt       DateTime @default(now())
+}
+
+// ----- Reservations (future bookings) -----
+model Reservation {
+  id              String   @id @default(cuid())
+  guestName       String
+  guestPhone      String
+  guestEmail      String?
+  roomId          String
+  room            Room     @relation(fields: [roomId], references: [id])
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  adults          Int      @default(1)
+  children        Int      @default(0)
+  advanceAmount   Float    @default(0)
+  status          String   @default("confirmed") // confirmed / cancelled / checked_in
+  notes           String?
+  source          String   @default("walk_in") // walk_in / phone / online / agent
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

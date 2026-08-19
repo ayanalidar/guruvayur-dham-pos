@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw, Pencil, Utensils } from 'lucide-react'
+import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw, Pencil, Utensils, CalendarClock, QrCode as QrIcon, Printer } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, apiFetch } from '@/lib/format'
+import { QrCode } from './qr-code'
 
 type Room = {
   id: string; number: string; floor: number; type: string; ratePerNight: number
@@ -31,6 +32,8 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [extendStayOpen, setExtendStayOpen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -86,6 +89,20 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
     onOrderFoodForCheckIn(ci.id, room.number, ci.guest.name)
   }
 
+  function handleExtendStay(room: Room) {
+    const ci = room.checkIns[0]
+    if (!ci) {
+      toast({ title: 'Room is not occupied', variant: 'destructive' }); return
+    }
+    setSelectedRoom(room)
+    setExtendStayOpen(true)
+  }
+
+  function handleShowQR(room: Room) {
+    setSelectedRoom(room)
+    setQrOpen(true)
+  }
+
   const floor1 = rooms.filter(r => r.floor === 1)
   const floor2 = rooms.filter(r => r.floor === 2)
 
@@ -110,14 +127,18 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
         onCheckout={(r) => { setSelectedRoom(r); setCheckoutOpen(true) }}
         onStatusChange={updateRoomStatus}
         onEdit={handleEditRoom}
-        onOrderFood={handleOrderFood} />
+        onOrderFood={handleOrderFood}
+        onExtendStay={handleExtendStay}
+        onShowQR={handleShowQR} />
 
       <FloorBlock title="Second Floor" subtitle="Deluxe & Suite" rooms={floor2}
         onSelect={setSelectedRoom} onCheckIn={(r) => { setSelectedRoom(r); setCheckInOpen(true) }}
         onCheckout={(r) => { setSelectedRoom(r); setCheckoutOpen(true) }}
         onStatusChange={updateRoomStatus}
         onEdit={handleEditRoom}
-        onOrderFood={handleOrderFood} />
+        onOrderFood={handleOrderFood}
+        onExtendStay={handleExtendStay}
+        onShowQR={handleShowQR} />
 
       <CheckInDialog
         open={checkInOpen}
@@ -137,11 +158,22 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
         room={selectedRoom}
         onDone={() => { setEditOpen(false); load() }}
       />
+      <ExtendStayDialog
+        open={extendStayOpen}
+        onOpenChange={setExtendStayOpen}
+        room={selectedRoom}
+        onDone={() => { setExtendStayOpen(false); load() }}
+      />
+      <RoomQRDialog
+        open={qrOpen}
+        onOpenChange={setQrOpen}
+        room={selectedRoom}
+      />
     </div>
   )
 }
 
-function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood }: {
+function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood, onExtendStay, onShowQR }: {
   title: string; subtitle: string; rooms: Room[]
   onSelect: (r: Room) => void
   onCheckIn: (r: Room) => void
@@ -149,6 +181,8 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
   onStatusChange: (r: Room, s: string) => void
   onEdit: (r: Room) => void
   onOrderFood: (r: Room) => void
+  onExtendStay: (r: Room) => void
+  onShowQR: (r: Room) => void
 }) {
   return (
     <div>
@@ -164,6 +198,8 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
             onStatusChange={(s) => onStatusChange(room, s)}
             onEdit={() => onEdit(room)}
             onOrderFood={() => onOrderFood(room)}
+            onExtendStay={() => onExtendStay(room)}
+            onShowQR={() => onShowQR(room)}
           />
         ))}
       </div>
@@ -171,13 +207,15 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
   )
 }
 
-function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood }: {
+function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood, onExtendStay, onShowQR }: {
   room: Room
   onCheckIn: () => void
   onCheckout: () => void
   onStatusChange: (s: string) => void
   onEdit: () => void
   onOrderFood?: () => void  // only when occupied
+  onExtendStay?: () => void  // only when occupied
+  onShowQR?: () => void  // optional — show QR code for room service menu
 }) {
   const status = room.status
   const activeCheckIn = room.checkIns[0]
@@ -250,9 +288,21 @@ function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrder
               <Button size="sm" variant="destructive" className="w-full" onClick={onCheckout}>
                 <LogOut className="h-3.5 w-3.5 mr-1.5" /> Check Out
               </Button>
-              {onOrderFood && (
-                <Button size="sm" variant="outline" className="w-full" onClick={onOrderFood}>
-                  <Utensils className="h-3.5 w-3.5 mr-1.5" /> Order Food for Room
+              <div className="grid grid-cols-2 gap-1.5">
+                {onOrderFood && (
+                  <Button size="sm" variant="outline" onClick={onOrderFood}>
+                    <Utensils className="h-3.5 w-3.5 mr-1" /> Food
+                  </Button>
+                )}
+                {onExtendStay && (
+                  <Button size="sm" variant="outline" onClick={onExtendStay}>
+                    <CalendarClock className="h-3.5 w-3.5 mr-1" /> Extend
+                  </Button>
+                )}
+              </div>
+              {onShowQR && (
+                <Button size="sm" variant="ghost" className="w-full text-xs" onClick={onShowQR}>
+                  <QrIcon className="h-3 w-3 mr-1" /> Show Room Menu QR
                 </Button>
               )}
             </>
@@ -289,6 +339,16 @@ function CheckInDialog({ open, onOpenChange, room, onDone }: {
     adults: 2, children: 0, advanceAmount: 0,
     expectedCheckOut: '', notes: '',
   })
+  // Returning-guest detection
+  const [returningGuest, setReturningGuest] = useState<{
+    found: boolean
+    guest?: {
+      id: string; name: string; phone: string; email: string | null; address: string | null
+      idProofType: string | null; idNumber: string | null
+      totalStays: number; lastVisit: string; lastRoom: string | null; roomsStayedIn: string[]
+    }
+  } | null>(null)
+  const [checkingGuest, setCheckingGuest] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -300,8 +360,40 @@ function CheckInDialog({ open, onOpenChange, room, onDone }: {
         expectedCheckOut: tomorrow.toISOString().slice(0, 16),
         notes: '',
       })
+      setReturningGuest(null)
     }
   }, [open, room])
+
+  // Debounced lookup when phone number changes (length >= 4)
+  useEffect(() => {
+    if (!form.phone || form.phone.replace(/\D/g, '').length < 4) {
+      setReturningGuest(null)
+      return
+    }
+    setCheckingGuest(true)
+    const t = setTimeout(async () => {
+      try {
+        const d = await apiFetch<{ found: boolean; guest?: any }>(`/api/guests/lookup?phone=${encodeURIComponent(form.phone)}`)
+        setReturningGuest(d as any)
+        if (d.found && d.guest) {
+          // Auto-fill form fields from existing guest record
+          setForm(prev => ({
+            ...prev,
+            guestName: prev.guestName || d.guest.name,
+            email: prev.email || d.guest.email || '',
+            address: prev.address || d.guest.address || '',
+            idProofType: prev.idProofType !== 'Aadhaar' ? prev.idProofType : (d.guest.idProofType || 'Aadhaar'),
+            idNumber: prev.idNumber || d.guest.idNumber || '',
+          }))
+        }
+      } catch {
+        setReturningGuest(null)
+      } finally {
+        setCheckingGuest(false)
+      }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [form.phone])
 
   async function submit() {
     if (!room) return
@@ -360,6 +452,30 @@ function CheckInDialog({ open, onOpenChange, room, onDone }: {
               <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 ..." />
             </Field>
           </div>
+
+          {/* Returning-guest detection banner */}
+          {checkingGuest && (
+            <p className="text-xs text-muted-foreground animate-pulse">Checking guest records...</p>
+          )}
+          {returningGuest?.found && returningGuest.guest && (
+            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs">
+              <p className="font-semibold text-emerald-800 flex items-center gap-2">
+                ↻ Returning Guest · {returningGuest.guest.totalStays} previous stay(s)
+              </p>
+              <p className="text-emerald-700 mt-0.5">
+                Last visited: {formatDateShort(returningGuest.guest.lastVisit)}
+                {returningGuest.guest.lastRoom && ` · Last room: ${returningGuest.guest.lastRoom}`}
+              </p>
+              {returningGuest.guest.roomsStayedIn.length > 0 && (
+                <p className="text-emerald-700 mt-0.5">
+                  Rooms stayed in: {returningGuest.guest.roomsStayedIn.join(', ')}
+                </p>
+              )}
+              <p className="text-[10px] text-emerald-600 mt-1 italic">
+                Form fields auto-filled from existing records — review and edit if needed.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Email (optional)">
@@ -729,6 +845,165 @@ function EditRoomDialog({ open, onOpenChange, room, onDone }: {
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting}>
             {submitting ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ====== Extend Stay / Modify Stay Dialog ======
+function ExtendStayDialog({ open, onOpenChange, room, onDone }: {
+  open: boolean; onOpenChange: (v: boolean) => void; room: Room | null; onDone: () => void
+}) {
+  const { toast } = useToast()
+  const [submitting, setSubmitting] = useState(false)
+  const [newCheckOut, setNewCheckOut] = useState('')
+  const [additionalAdvance, setAdditionalAdvance] = useState(0)
+  const [adults, setAdults] = useState(2)
+  const [children, setChildren] = useState(0)
+
+  useEffect(() => {
+    if (open && room) {
+      const ci = room.checkIns[0]
+      if (ci) {
+        // Default new checkout = existing expected checkout + 1 day, or tomorrow + 1 day
+        const base = ci.expectedCheckOut ? new Date(ci.expectedCheckOut) : new Date(Date.now() + 86400000)
+        base.setDate(base.getDate() + 1)
+        setNewCheckOut(base.toISOString().slice(0, 16))
+        setAdults(ci.adults)
+        setChildren(ci.children)
+        setAdditionalAdvance(0)
+      }
+    }
+  }, [open, room])
+
+  async function submit() {
+    if (!room) return
+    const ci = room.checkIns[0]
+    if (!ci) return
+
+    setSubmitting(true)
+    try {
+      await apiFetch(`/api/checkins/${ci.id}/extend`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          expectedCheckOut: newCheckOut ? new Date(newCheckOut).toISOString() : undefined,
+          adults: Number(adults),
+          children: Number(children),
+          additionalAdvance: Number(additionalAdvance) || 0,
+        }),
+      })
+      toast({ title: 'Stay extended', description: `New checkout: ${formatDateShort(newCheckOut)}` })
+      onDone()
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!room) return null
+  const ci = room.checkIns[0]
+  if (!ci) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarClock className="h-4 w-4" /> Extend / Modify Stay — Room {room.number}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          <div className="rounded-lg border bg-muted/30 p-3 text-xs">
+            <p><span className="text-muted-foreground">Guest:</span> <strong>{ci.guest.name}</strong></p>
+            <p><span className="text-muted-foreground">Current check-in:</span> {formatDateShort(ci.checkInAt)}</p>
+            <p><span className="text-muted-foreground">Current checkout:</span> {ci.expectedCheckOut ? formatDateShort(ci.expectedCheckOut) : '—'}</p>
+            <p><span className="text-muted-foreground">Advance paid:</span> {formatINR(ci.advanceAmount)}</p>
+          </div>
+
+          <Field label="New Check-out Date & Time">
+            <Input type="datetime-local" value={newCheckOut} onChange={e => setNewCheckOut(e.target.value)} />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Adults">
+              <Input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value))} />
+            </Field>
+            <Field label="Children">
+              <Input type="number" min={0} value={children} onChange={e => setChildren(Number(e.target.value))} />
+            </Field>
+          </div>
+
+          <Field label="Additional Advance (₹)">
+            <Input type="number" min={0} value={additionalAdvance} onChange={e => setAdditionalAdvance(Number(e.target.value))} />
+          </Field>
+
+          <p className="text-xs text-muted-foreground italic">
+            For early checkout, set the new checkout date to an earlier time. The hotel invoice (when generated at checkout) will use this updated date.
+          </p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? 'Saving...' : 'Update Stay'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ====== Room QR Code Dialog — for room service menu ======
+function RoomQRDialog({ open, onOpenChange, room }: {
+  open: boolean; onOpenChange: (v: boolean) => void; room: Room | null
+}) {
+  if (!room) return null
+
+  // Build the public menu URL for this room
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const menuUrl = `${origin}/menu/${room.id}`
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <QrIcon className="h-4 w-4" /> Room {room.number} — Menu QR Code
+          </DialogTitle>
+          <DialogDescription>
+            Display this QR code in the room. Guests scan it with their phone to view the menu and call the front desk to order.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col items-center py-4">
+          <div className="p-4 bg-white border rounded-lg">
+            <QrCode value={menuUrl} size={240} alt={`Menu QR for Room ${room.number}`} />
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 text-center break-all">
+            {menuUrl}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => {
+              navigator.clipboard.writeText(menuUrl)
+              // Toast via parent — simple alert for now
+              alert('URL copied to clipboard')
+            }}
+          >
+            Copy URL
+          </Button>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" /> Print QR
           </Button>
         </DialogFooter>
       </DialogContent>
