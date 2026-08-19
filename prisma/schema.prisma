@@ -1,0 +1,180 @@
+// Hotel GuruVayurDham POS - Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ----- Hotel Config (single-row settings) -----
+model HotelConfig {
+  id            String   @id @default("main")
+  name          String   @default("Hotel GuruVayurDham")
+  address       String   @default("")
+  phone         String   @default("")
+  email         String   @default("")
+  gstNumber     String   @default("")
+  sacCode       String   @default("")
+  cgstRate      Float    @default(9.0)
+  sgstRate      Float    @default(9.0)
+  updatedAt     DateTime @updatedAt
+}
+
+// ----- Rooms -----
+// Rooms 101-107 (Floor 1) and 201-208 (Floor 2) — total 15 rooms
+model Room {
+  id            String   @id @default(cuid())
+  number        String   @unique // e.g. "101", "207"
+  floor         Int      // 1 or 2
+  type          String   @default("Standard") // Standard / Deluxe / Suite
+  ratePerNight  Float    @default(1500)
+  bedType       String   @default("Double")  // Single / Double / Twin
+  capacity      Int      @default(2)
+  status        String   @default("available") // available / occupied / cleaning / maintenance
+  notes         String?
+  checkIns      CheckIn[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ----- Guests -----
+model Guest {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  email       String?
+  address     String?
+  idProofType String?  // Aadhaar / Passport / Driving License / Voter ID
+  idNumber    String?
+  checkIns    CheckIn[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ----- Check-ins (Stays) -----
+model CheckIn {
+  id              String   @id @default(cuid())
+  guestId         String
+  guest           Guest    @relation(fields: [guestId], references: [id])
+  roomId          String
+  room            Room     @relation(fields: [roomId], references: [id])
+  checkInAt       DateTime @default(now())
+  expectedCheckOut DateTime?
+  checkOutAt      DateTime?
+  status          String   @default("active") // active / checked_out
+  advanceAmount   Float    @default(0)
+  discount        Float    @default(0) // flat discount applied on hotel invoice
+  adults          Int      @default(1)
+  children        Int      @default(0)
+  notes           String?
+  foodOrders      FoodOrder[]
+  hotelInvoice    HotelInvoice?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ----- Menu Items (Kitchen) -----
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // Breakfast / Starters / Main Course / Breads / Rice / Beverages / Desserts / South Indian / Chinese
+  price       Float
+  isVeg       Boolean  @default(true)
+  available   Boolean  @default(true)
+  description String?
+  prepTime    Int      @default(15) // minutes
+  orderItems  FoodOrderItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ----- Food Orders -----
+model FoodOrder {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique // e.g. "ORD-2026-0001"
+  checkInId     String?  // null = walk-in / separate bill
+  checkIn       CheckIn? @relation(fields: [checkInId], references: [id])
+  customerName  String   @default("Walk-in Guest")
+  roomNumber    String?  // snapshot for printing
+  tableNumber   String?  // for dine-in
+  orderType     String   @default("dine_in") // dine_in / room_service / takeaway
+  status        String   @default("pending") // pending / preparing / ready / served / cancelled
+  paymentMode   String   @default("room_account") // room_account / separate
+  itemsTotal    Float    @default(0)
+  cgstAmount    Float    @default(0)
+  sgstAmount    Float    @default(0)
+  grandTotal    Float    @default(0)
+  notes         String?
+  items         FoodOrderItem[]
+  foodInvoice   FoodInvoice?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FoodOrderItem {
+  id           String   @id @default(cuid())
+  orderId      String
+  order        FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId   String?
+  menuItem     MenuItem? @relation(fields: [menuItemId], references: [id])
+  name         String   // snapshot
+  price        Float    // snapshot
+  quantity     Int      @default(1)
+  total        Float    // price * quantity
+  notes        String?
+}
+
+// ----- Hotel Invoice (covers room + room-service food + taxes) -----
+model HotelInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique // e.g. "HOT-2026-0001"
+  checkInId       String   @unique
+  checkIn         CheckIn   @relation(fields: [checkInId], references: [id])
+  guestName       String
+  guestPhone      String
+  roomNumber      String
+  roomType        String
+  checkInAt       DateTime
+  checkOutAt      DateTime
+  nights          Int
+  ratePerNight    Float
+  roomCharges     Float
+  foodCharges     Float   // sum of room_account food orders
+  extraCharges    Float   @default(0)
+  discount        Float   @default(0)
+  taxableAmount   Float
+  cgstRate        Float
+  sgstRate        Float
+  cgstAmount      Float
+  sgstAmount      Float
+  grandTotal      Float
+  advancePaid     Float
+  balanceDue      Float
+  paymentMethod   String? // Cash / Card / UPI / Mixed
+  notes           String?
+  createdAt       DateTime @default(now())
+}
+
+// ----- Food Invoice (separate bill for food orders) -----
+model FoodInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique // e.g. "FOO-2026-0001"
+  orderId         String   @unique
+  order           FoodOrder @relation(fields: [orderId], references: [id])
+  customerName    String
+  roomNumber      String?
+  tableNumber     String?
+  orderType       String
+  itemsTotal      Float
+  cgstRate        Float
+  sgstRate        Float
+  cgstAmount      Float
+  sgstAmount      Float
+  grandTotal      Float
+  paymentMethod   String?
+  notes           String?
+  createdAt       DateTime @default(now())
+}
