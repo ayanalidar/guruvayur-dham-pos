@@ -1,13 +1,15 @@
 import { PrismaClient } from '@prisma/client'
+import { execSync } from 'child_process'
+import fs from 'fs'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
   prismaSeeded: boolean | undefined
+  schemaPushed: boolean | undefined
 }
 
 // Always create a fresh client in dev to avoid stale file handles when the DB file is reset
-// outside the dev process. In production, reuse the global instance for performance
-// (and to keep the SQLite file handle alive across serverless invocations in the same container).
+// outside the dev process. In production, reuse the global instance for performance.
 function createClient() {
   return new PrismaClient({
     log: ['error', 'warn'],
@@ -19,10 +21,35 @@ export const db = process.env.NODE_ENV === 'production'
   : createClient()
 
 // On Vercel (serverless), the SQLite file is ephemeral — it resets on each cold start.
-// This function ensures the DB has the seed data (hotel config, rooms, menu items) on first use.
+// This function ensures the DB schema exists (via `prisma db push`) AND is seeded on first use.
 // Call it from API routes that need a seeded DB.
 export async function ensureSeeded() {
   if (globalForPrisma.prismaSeeded) return
+
+  // Step 1: Ensure the SQLite schema exists in the DB file.
+  // On Vercel, the file is at /tmp/gvd-pos.db and starts empty on cold start.
+  // Running `prisma db push` creates all tables.
+  if (!globalForPrisma.schemaPushed) {
+    const dbUrl = process.env.DATABASE_URL || ''
+    // Only run db push if the DB is a SQLite file that doesn't exist yet
+    if (dbUrl.startsWith('file:')) {
+      const filePath = dbUrl.replace('file:', '')
+      if (!fs.existsSync(filePath)) {
+        try {
+          execSync('npx prisma db push --skip-generate --accept-data-loss', {
+            stdio: 'ignore',
+            env: { ...process.env },
+            timeout: 30000,
+          })
+          console.log('[seed] schema created via prisma db push')
+        } catch (e) {
+          console.error('[seed] schema push failed:', e)
+        }
+      }
+    }
+    globalForPrisma.schemaPushed = true
+  }
+
   globalForPrisma.prismaSeeded = true
 
   try {
@@ -136,3 +163,4 @@ export async function ensureSeeded() {
     console.error('[seed] failed:', e)
   }
 }
+

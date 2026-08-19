@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "bun run db:push && bun run build",
+  "buildCommand": "prisma generate && bun run build",
   "installCommand": "bun install",
   "regions": ["bom1"],
   "env": {
