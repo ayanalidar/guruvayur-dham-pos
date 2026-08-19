@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ServiceWorkerRegister } from "@/components/pos/sw-register";
 import { PwaInstallPrompt } from "@/components/pos/pwa-install-prompt";
+import { ErrorBoundary } from "@/components/pos/error-boundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -73,10 +74,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        {children}
-        <Toaster />
-        <ServiceWorkerRegister />
-        <PwaInstallPrompt />
+        <ErrorBoundary>
+          {children}
+          <Toaster />
+          <ServiceWorkerRegister />
+          <PwaInstallPrompt />
+        </ErrorBoundary>
       </body>
     </html>
   );

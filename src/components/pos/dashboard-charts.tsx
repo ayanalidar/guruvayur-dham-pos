@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TrendingUp, BarChart3, Utensils, Bed } from 'lucide-react'
 import { formatINR, apiFetch } from '@/lib/format'
@@ -18,7 +18,7 @@ type ChartsData = {
 
 const COLORS = ['#B22222', '#8B0000', '#D4AF37', '#006400', '#4682B4', '#9932CC', '#FF8C00', '#2E8B57', '#DC143C', '#1E90FF']
 
-export function DashboardCharts() {
+export const DashboardCharts = memo(function DashboardCharts() {
   const [data, setData] = useState<ChartsData | null>(null)
 
   useEffect(() => {
@@ -136,7 +136,7 @@ export function DashboardCharts() {
       </Card>
     </div>
   )
-}
+})
 
 function EmptyChart({ message }: { message: string }) {
   return (

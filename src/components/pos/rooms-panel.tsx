@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -207,7 +207,7 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
   )
 }
 
-function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood, onExtendStay, onShowQR }: {
+const RoomCard = memo(function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood, onExtendStay, onShowQR }: {
   room: Room
   onCheckIn: () => void
   onCheckout: () => void
@@ -326,7 +326,7 @@ function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrder
       </CardContent>
     </Card>
   )
-}
+})
 
 function CheckInDialog({ open, onOpenChange, room, onDone }: {
   open: boolean; onOpenChange: (v: boolean) => void; room: Room | null; onDone: () => void

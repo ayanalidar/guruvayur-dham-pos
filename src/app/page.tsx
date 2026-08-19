@@ -175,7 +175,15 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
   async function save() {
     try {
-      await apiFetch('/api/config', { method: 'PATCH', body: JSON.stringify(config) })
+      // Don't send posPin if it's empty (keep existing)
+      const { posPin, ...rest } = config
+      const payload: any = { ...rest }
+      if (posPin && /^\d{4,6}$/.test(posPin)) {
+        payload.posPin = posPin
+      }
+      // Remove hasPin (read-only, not accepted by PATCH)
+      delete payload.hasPin
+      await apiFetch('/api/config', { method: 'PATCH', body: JSON.stringify(payload) })
       toast({ title: 'Settings saved' })
       onOpenChange(false)
     } catch (e: any) {
@@ -229,9 +237,13 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               type="password"
               inputMode="numeric"
               maxLength={6}
-              value={config.posPin ?? '1234'}
+              placeholder={config.hasPin ? '•••• (enter new PIN to change)' : 'Enter PIN'}
+              value={config.posPin ?? ''}
               onChange={e => setConfig({ ...config, posPin: e.target.value.replace(/\D/g, '') })}
             />
+            {config.hasPin && !config.posPin && (
+              <p className="text-[10px] text-muted-foreground mt-1">A PIN is set. Leave blank to keep current.</p>
+            )}
           </FieldRow>
           <FieldRow label="Google Review Link (shared via WhatsApp)">
             <Input

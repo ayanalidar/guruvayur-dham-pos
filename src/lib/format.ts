@@ -49,13 +49,27 @@ export function timeAgo(d: Date | string | null | undefined): string {
 }
 
 export async function apiFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', ...(opts?.headers || {}) },
-  })
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data?.error || `Request failed: ${res.status}`)
+  try {
+    const res = await fetch(url, {
+      ...opts,
+      headers: { 'Content-Type': 'application/json', ...(opts?.headers || {}) },
+    })
+    // Handle non-JSON responses gracefully
+    const contentType = res.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+      throw new Error('Unexpected response format')
+    }
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data?.error || `Request failed: ${res.status}`)
+    }
+    return data as T
+  } catch (e: any) {
+    // Network errors, CORS, timeout, etc.
+    if (e instanceof TypeError && e.message.includes('fetch')) {
+      throw new Error('Network error — please check your connection')
+    }
+    throw e
   }
-  return data as T
 }

@@ -44,24 +44,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'At least one item required' }, { status: 400 })
   }
 
+  // VAPT: Validate orderType and paymentMode against allowed values
+  const validOrderTypes = ['dine_in', 'room_service', 'takeaway']
+  const validPaymentModes = ['room_account', 'separate']
+  const safeOrderType = validOrderTypes.includes(orderType) ? orderType : 'dine_in'
+  const safePaymentMode = validPaymentModes.includes(paymentMode) ? paymentMode : 'separate'
+
+  // VAPT: Sanitize string inputs
+  const safeCustomerName = String(customerName).trim().slice(0, 200)
+  const safeRoomNumber = roomNumber ? String(roomNumber).trim().slice(0, 10) : null
+  const safeTableNumber = tableNumber ? String(tableNumber).trim().slice(0, 10) : null
+  const safeNotes = notes ? String(notes).trim().slice(0, 1000) : null
+
   // if room_account, ensure a valid active check-in exists
-  if (paymentMode === 'room_account') {
+  if (safePaymentMode === 'room_account') {
     if (!checkInId) return NextResponse.json({ error: 'checkInId required for room_account' }, { status: 400 })
-    const ci = await db.checkIn.findUnique({ where: { id: checkInId } })
+    const ci = await db.checkIn.findUnique({ where: { id: String(checkInId) } })
     if (!ci || ci.status !== 'active') {
       return NextResponse.json({ error: 'Active check-in not found' }, { status: 400 })
     }
   }
 
-  // compute totals
-  const orderItems = items.map((it: any) => ({
-    menuItemId: it.menuItemId || null,
-    name: it.name,
-    price: Number(it.price),
-    quantity: Number(it.quantity),
-    total: Number(it.price) * Number(it.quantity),
-    notes: it.notes || null,
-  }))
+  // VAPT: Validate and sanitize each item
+  const orderItems = items.slice(0, 100).map((it: any) => {
+    const qty = Math.max(1, Math.min(999, Number(it.quantity) || 1))
+    const price = Math.max(0, Math.min(100000, Number(it.price) || 0))
+    return {
+      menuItemId: it.menuItemId ? String(it.menuItemId) : null,
+      name: String(it.name || '').trim().slice(0, 200),
+      price,
+      quantity: qty,
+      total: price * qty,
+      notes: it.notes ? String(it.notes).trim().slice(0, 500) : null,
+    }
+  })
   const itemsTotal = orderItems.reduce((s: number, it: any) => s + it.total, 0)
 
   const config = await db.hotelConfig.findUnique({ where: { id: 'main' } })
@@ -76,18 +92,18 @@ export async function POST(req: NextRequest) {
   const order = await db.foodOrder.create({
     data: {
       orderNumber,
-      checkInId: paymentMode === 'room_account' ? checkInId : null,
-      customerName,
-      roomNumber,
-      tableNumber,
-      orderType,
-      paymentMode,
+      checkInId: safePaymentMode === 'room_account' ? String(checkInId) : null,
+      customerName: safeCustomerName,
+      roomNumber: safeRoomNumber,
+      tableNumber: safeTableNumber,
+      orderType: safeOrderType,
+      paymentMode: safePaymentMode,
       status: 'pending',
       itemsTotal,
       cgstAmount,
       sgstAmount,
       grandTotal,
-      notes,
+      notes: safeNotes,
       items: { create: orderItems },
     },
     include: { items: true },

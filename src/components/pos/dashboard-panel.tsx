@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Bed, Utensils, Receipt, TrendingUp, Clock, AlertCircle } from 'lucide-react'
+import { Bed, Utensils, Receipt, TrendingUp, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import { formatINR, formatDateShort, timeAgo, apiFetch } from '@/lib/format'
 import { DashboardCharts } from './dashboard-charts'
 
@@ -20,21 +20,50 @@ type DashboardData = {
 export function DashboardPanel({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
+  const load = useCallback(async () => {
+    try {
+      const d = await apiFetch<DashboardData>('/api/dashboard')
+      setData(d)
+      setLoading(false)
+    } catch (e) {
+      setLoading(false)
+    }
+  }, [])
+
+  // Load once on mount — no polling. User can manually refresh.
   useEffect(() => {
-    let mounted = true
-    async function load() {
+    let active = true
+    ;(async () => {
       try {
         const d = await apiFetch<DashboardData>('/api/dashboard')
-        if (mounted) { setData(d); setLoading(false) }
+        if (active) { setData(d); setLoading(false) }
       } catch (e) {
-        if (mounted) setLoading(false)
+        if (active) setLoading(false)
+      }
+    })()
+    return () => { active = false }
+  }, [])
+
+  // Refresh only when tab becomes visible again (after being hidden)
+  // — NOT on an interval. This avoids the blinking.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshing(true)
+        load().finally(() => setRefreshing(false))
       }
     }
-    load()
-    const t = setInterval(load, 15000)
-    return () => { mounted = false; clearInterval(t) }
-  }, [])
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
+
+  async function manualRefresh() {
+    setRefreshing(true)
+    await load()
+    setRefreshing(false)
+  }
 
   if (loading || !data) {
     return (
@@ -51,6 +80,12 @@ export function DashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
   return (
     <div className="space-y-6">
       {/* Top stats */}
+      <div className="flex justify-end">
+        <Button variant="ghost" size="sm" onClick={manualRefresh} disabled={refreshing}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </Button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Occupied Rooms"
@@ -169,7 +204,7 @@ export function DashboardPanel({ onNavigate }: { onNavigate: (tab: string) => vo
   )
 }
 
-function StatCard({ title, value, sub, icon, accent }: {
+const StatCard = memo(function StatCard({ title, value, sub, icon, accent }: {
   title: string; value: string; sub: string; icon: React.ReactNode; accent: string
 }) {
   return (
@@ -186,7 +221,7 @@ function StatCard({ title, value, sub, icon, accent }: {
       </CardContent>
     </Card>
   )
-}
+})
 
 function RoomStatusPill({ label, count, dot }: { label: string; count: number; dot: string }) {
   return (

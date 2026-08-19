@@ -8,7 +8,7 @@ import { Delete, LogIn, Shield, Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/format'
 import { GuardianXBrand } from './guardianx-brand'
 
-type Config = { name: string; posPin: string }
+type Config = { name: string; hasPin: boolean }
 
 export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast()
@@ -18,9 +18,10 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
+    // SECURITY: config no longer returns the PIN — only a 'hasPin' boolean
     apiFetch<{ config: Config }>('/api/config')
-      .then(d => setConfig({ name: d.config.name, posPin: d.config.posPin }))
-      .catch(() => setConfig({ name: 'Hotel Guruvayur Dham', posPin: '1234' }))
+      .then(d => setConfig({ name: d.config.name, hasPin: d.config.hasPin }))
+      .catch(() => setConfig({ name: 'Hotel Guruvayur Dham', hasPin: true }))
       .finally(() => setLoading(false))
   }, [])
 
@@ -28,8 +29,8 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
     if (pin.length >= 6) return
     const next = pin + d
     setPin(next)
-    // Auto-submit when reaching 4 digits (default PIN length)
-    if (next.length === 4 && config?.posPin.length === 4) {
+    // Auto-submit when reaching 4 digits (most common PIN length)
+    if (next.length === 4) {
       submitPin(next)
     }
   }
@@ -42,18 +43,34 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
     const v = value ?? pin
     if (!config) return
     setSubmitting(true)
-    // Small delay to avoid timing attacks / give visual feedback
-    await new Promise(r => setTimeout(r, 250))
-    if (v === config.posPin) {
-      sessionStorage.setItem('posAuth', 'true')
-      sessionStorage.setItem('posAuthAt', String(Date.now()))
-      toast({ title: `Welcome to ${config.name}` })
-      onSuccess()
-    } else {
-      toast({ title: 'Incorrect PIN', description: 'Please try again', variant: 'destructive' })
+    try {
+      // SECURITY: PIN is verified server-side — never exposed to the client
+      const r = await apiFetch<{ valid: boolean; token?: string; error?: string; attemptsRemaining?: number; retryAfter?: number }>('/api/auth/verify-pin', {
+        method: 'POST',
+        body: JSON.stringify({ pin: v }),
+      })
+      if (r.valid && r.token) {
+        sessionStorage.setItem('posAuth', 'true')
+        sessionStorage.setItem('posAuthAt', String(Date.now()))
+        sessionStorage.setItem('posAuthToken', r.token)
+        toast({ title: `Welcome to ${config.name}` })
+        onSuccess()
+      } else {
+        toast({ title: 'Incorrect PIN', description: 'Please try again', variant: 'destructive' })
+        setPin('')
+      }
+    } catch (e: any) {
+      // Rate-limited or server error
+      const msg = e.message || 'Login failed'
+      if (msg.includes('Too many') || msg.includes('rate')) {
+        toast({ title: 'Too many attempts', description: 'Please wait a minute and try again.', variant: 'destructive' })
+      } else {
+        toast({ title: 'Incorrect PIN', description: 'Please try again', variant: 'destructive' })
+      }
       setPin('')
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
   }
 
   if (loading) {

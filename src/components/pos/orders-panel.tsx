@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,9 +56,13 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
     return () => { active = false }
   }, [toast])
 
+  // No polling — refresh on visibility change only (avoids blinking cards)
   useEffect(() => {
-    const t = setInterval(load, 10000)
-    return () => clearInterval(t)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [load])
 
   async function updateStatus(order: FoodOrder, status: string) {
@@ -198,7 +202,7 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
   )
 }
 
-function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKOT }: {
+const OrderCard = memo(function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKOT }: {
   order: FoodOrder
   onStatus: (o: FoodOrder, s: string) => void
   onNavigate?: (t: string) => void
@@ -298,4 +302,4 @@ function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKO
       </CardContent>
     </Card>
   )
-}
+})
