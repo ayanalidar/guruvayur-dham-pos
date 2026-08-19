@@ -37,19 +37,32 @@ export async function ensureSeeded() {
 
     if (!tableExists) {
       try {
-        // Split SQL on semicolons followed by newline, execute each statement
+        // Split SQL into individual statements.
+        // The schema.sql has comments like "-- CreateTable" before each CREATE statement,
+        // with statements separated by ";\n\n-- Create...".
+        // We split on ";\n\n" (semicolon + blank line) to keep multi-line CREATE TABLE statements intact,
+        // then strip leading comment lines from each statement.
         const statements = SCHEMA_SQL
-          .split(/;\s*\n/)
+          .split(/;\s*\n\s*\n/)
           .map(s => s.trim())
-          .filter(s => s && !s.startsWith('--'))
+          .filter(s => s)
+          // Strip leading comment lines (lines starting with --)
+          .map(s => {
+            const lines = s.split('\n').filter(l => !l.trim().startsWith('--'))
+            return lines.join('\n').trim()
+          })
+          .filter(s => s) // remove any that became empty after stripping comments
+          // Append the semicolon back
+          .map(s => s.endsWith(';') ? s : s + ';')
+        console.log('[seed] executing ' + statements.length + ' SQL statements')
         for (const stmt of statements) {
           try {
             await db.$executeRawUnsafe(stmt)
           } catch (e) {
-            // Statement may fail if table already exists — ignore
+            console.warn('[seed] statement failed (continuing):', (e as Error).message?.substring(0, 100))
           }
         }
-        console.log('[seed] schema created via raw SQL (' + statements.length + ' statements)')
+        console.log('[seed] schema created via raw SQL')
       } catch (e) {
         console.error('[seed] schema creation failed:', e)
       }
