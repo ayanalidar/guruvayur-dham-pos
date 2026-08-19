@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureSeeded } from '@/lib/db'
 
 // GET /api/dashboard — overview stats
 export async function GET() {
+  await ensureSeeded()
   const totalRooms = await db.room.count()
   const occupied = await db.room.count({ where: { status: 'occupied' } })
   const available = await db.room.count({ where: { status: 'available' } })

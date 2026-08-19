@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureSeeded } from '@/lib/db'
 
 // GET /api/config — get hotel config (PIN is included for the login screen to compare)
 export async function GET() {
+  await ensureSeeded()
   let config = await db.hotelConfig.findUnique({ where: { id: 'main' } })
   if (!config) {
     config = await db.hotelConfig.create({ data: { id: 'main' } })

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureSeeded } from '@/lib/db'
 
 // GET /api/rooms — list all rooms with active check-in info
 export async function GET() {
+  await ensureSeeded()
   const rooms = await db.room.findMany({
     orderBy: [{ floor: 'asc' }, { number: 'asc' }],
     include: {

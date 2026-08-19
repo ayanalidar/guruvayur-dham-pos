@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, ensureSeeded } from '@/lib/db'
 
 // GET /api/menu — list all menu items
 export async function GET() {
+  await ensureSeeded()
   const items = await db.menuItem.findMany({
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   })
