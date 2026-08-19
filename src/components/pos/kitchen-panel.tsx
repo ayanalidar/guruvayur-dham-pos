@@ -26,7 +26,10 @@ type CheckIn = {
 }
 type CartItem = { menuItemId: string; name: string; price: number; quantity: number; isVeg: boolean }
 
-export function KitchenPanel() {
+export function KitchenPanel({ preselectCheckIn, onConsumed }: {
+  preselectCheckIn?: { checkInId: string; roomNumber: string; guestName: string } | null
+  onConsumed?: () => void
+}) {
   const [tab, setTab] = useState<'order' | 'menu'>('order')
   return (
     <div className="space-y-4">
@@ -35,14 +38,17 @@ export function KitchenPanel() {
           <TabsTrigger value="order"><ShoppingCart className="h-4 w-4 mr-1.5" /> New Order</TabsTrigger>
           <TabsTrigger value="menu"><Utensils className="h-4 w-4 mr-1.5" /> Menu Management</TabsTrigger>
         </TabsList>
-        <TabsContent value="order" className="mt-4"><OrderTab /></TabsContent>
+        <TabsContent value="order" className="mt-4"><OrderTab preselectCheckIn={preselectCheckIn} onConsumed={onConsumed} /></TabsContent>
         <TabsContent value="menu" className="mt-4"><MenuTab /></TabsContent>
       </Tabs>
     </div>
   )
 }
 
-function OrderTab() {
+function OrderTab({ preselectCheckIn, onConsumed }: {
+  preselectCheckIn?: { checkInId: string; roomNumber: string; guestName: string } | null
+  onConsumed?: () => void
+}) {
   const { toast } = useToast()
   const [menu, setMenu] = useState<MenuItem[]>([])
   const [checkIns, setCheckIns] = useState<CheckIn[]>([])
@@ -92,6 +98,28 @@ function OrderTab() {
       setSelectedCheckIn(checkIns[0].id)
     }
   }, [paymentMode, checkIns, selectedCheckIn])
+
+  // Consume preselectCheckIn from parent (Rooms → Order Food for Room)
+  useEffect(() => {
+    if (preselectCheckIn && checkIns.length > 0) {
+      // Verify the check-in still exists (not checked out)
+      const ci = checkIns.find(c => c.id === preselectCheckIn.checkInId)
+      if (ci) {
+        setSelectedCheckIn(ci.id)
+        setPaymentMode('room_account')
+        setOrderType('room_service')
+        setCustomerName(ci.guest.name)
+        if (onConsumed) onConsumed()
+      } else {
+        toast({
+          title: 'Check-in no longer active',
+          description: `Guest ${preselectCheckIn.guestName} may have already checked out.`,
+          variant: 'destructive',
+        })
+        if (onConsumed) onConsumed()
+      }
+    }
+  }, [preselectCheckIn, checkIns, onConsumed, toast])
 
   // when selecting a check-in, also auto-fill customer name & room number for printing
   useEffect(() => {

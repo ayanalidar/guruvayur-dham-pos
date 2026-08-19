@@ -6,10 +6,11 @@ import { RoomsPanel } from '@/components/pos/rooms-panel'
 import { KitchenPanel } from '@/components/pos/kitchen-panel'
 import { OrdersPanel } from '@/components/pos/orders-panel'
 import { InvoicesPanel } from '@/components/pos/invoices-panel'
+import { GuestsPanel } from '@/components/pos/guests-panel'
 import { LoginScreen } from '@/components/pos/login-screen'
 import { GuardianXBrand } from '@/components/pos/guardianx-brand'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut, Users } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -18,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { apiFetch } from '@/lib/format'
 
-type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices'
+type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices' | 'guests'
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -26,11 +27,14 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'kitchen',   label: 'Kitchen',   icon: <Utensils className="h-4 w-4" /> },
   { id: 'orders',    label: 'Orders',    icon: <ClipboardList className="h-4 w-4" /> },
   { id: 'invoices',  label: 'Invoices',  icon: <Receipt className="h-4 w-4" /> },
+  { id: 'guests',    label: 'Guests',    icon: <Users className="h-4 w-4" /> },
 ]
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>('dashboard')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Pre-fill Kitchen tab with a check-in when "Order Food for Room" is clicked
+  const [pendingOrderForCheckIn, setPendingOrderForCheckIn] = useState<{ checkInId: string; roomNumber: string; guestName: string } | null>(null)
   // Lazy initialiser reads sessionStorage once on first render (client-side)
   // — no flash, no extra render, no eslint warning.
   const [authed, setAuthed] = useState<boolean>(() => {
@@ -46,6 +50,13 @@ export default function Home() {
     sessionStorage.removeItem('posAuth')
     sessionStorage.removeItem('posAuthAt')
     setAuthed(false)
+  }
+
+  // Called from RoomsPanel when "Order Food for Room" is clicked on an occupied room.
+  // Switches to Kitchen tab and pre-selects the check-in for room-account billing.
+  function handleOrderFoodForCheckIn(checkInId: string, roomNumber: string, guestName: string) {
+    setPendingOrderForCheckIn({ checkInId, roomNumber, guestName })
+    setTab('kitchen')
   }
 
   if (!authed) return <LoginScreen onSuccess={handleLogin} />
@@ -122,7 +133,7 @@ export default function Home() {
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="h-14 border-b bg-card px-4 lg:px-6 flex items-center justify-between shrink-0">
           <div>
-            <h1 className="text-base lg:text-lg font-semibold capitalize">{tab === 'kitchen' ? 'Kitchen & Menu' : tab}</h1>
+            <h1 className="text-base lg:text-lg font-semibold capitalize">{tab === 'kitchen' ? 'Kitchen & Menu' : tab === 'guests' ? 'Customer Records' : tab}</h1>
           </div>
           <div className="text-xs text-muted-foreground">
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
@@ -131,10 +142,11 @@ export default function Home() {
 
         <div className="flex-1 p-4 lg:p-6 overflow-auto">
           {tab === 'dashboard' && <DashboardPanel onNavigate={(t) => setTab(t as Tab)} />}
-          {tab === 'rooms' && <RoomsPanel />}
-          {tab === 'kitchen' && <KitchenPanel />}
+          {tab === 'rooms' && <RoomsPanel onOrderFoodForCheckIn={handleOrderFoodForCheckIn} />}
+          {tab === 'kitchen' && <KitchenPanel preselectCheckIn={pendingOrderForCheckIn} onConsumed={() => setPendingOrderForCheckIn(null)} />}
           {tab === 'orders' && <OrdersPanel onNavigate={(t) => setTab(t as Tab)} />}
           {tab === 'invoices' && <InvoicesPanel />}
+          {tab === 'guests' && <GuestsPanel />}
         </div>
       </main>
 

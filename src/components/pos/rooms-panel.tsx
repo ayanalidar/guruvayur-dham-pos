@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw } from 'lucide-react'
+import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw, Pencil, Utensils } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, apiFetch } from '@/lib/format'
 
 type Room = {
@@ -23,13 +23,14 @@ type Room = {
   }>
 }
 
-export function RoomsPanel() {
+export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: (checkInId: string, roomNumber: string, guestName: string) => void }) {
   const { toast } = useToast()
   const [rooms, setRooms] = useState<Room[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null)
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +69,23 @@ export function RoomsPanel() {
     }
   }
 
+  function handleEditRoom(room: Room) {
+    setSelectedRoom(room)
+    setEditOpen(true)
+  }
+
+  function handleOrderFood(room: Room) {
+    const ci = room.checkIns[0]
+    if (!ci) {
+      toast({ title: 'Room is not occupied', variant: 'destructive' }); return
+    }
+    if (!onOrderFoodForCheckIn) {
+      toast({ title: 'Order food not available', description: 'Kitchen tab not wired up', variant: 'destructive' })
+      return
+    }
+    onOrderFoodForCheckIn(ci.id, room.number, ci.guest.name)
+  }
+
   const floor1 = rooms.filter(r => r.floor === 1)
   const floor2 = rooms.filter(r => r.floor === 2)
 
@@ -90,12 +108,16 @@ export function RoomsPanel() {
       <FloorBlock title="First Floor" subtitle="Standard & Deluxe" rooms={floor1}
         onSelect={setSelectedRoom} onCheckIn={(r) => { setSelectedRoom(r); setCheckInOpen(true) }}
         onCheckout={(r) => { setSelectedRoom(r); setCheckoutOpen(true) }}
-        onStatusChange={updateRoomStatus} />
+        onStatusChange={updateRoomStatus}
+        onEdit={handleEditRoom}
+        onOrderFood={handleOrderFood} />
 
       <FloorBlock title="Second Floor" subtitle="Deluxe & Suite" rooms={floor2}
         onSelect={setSelectedRoom} onCheckIn={(r) => { setSelectedRoom(r); setCheckInOpen(true) }}
         onCheckout={(r) => { setSelectedRoom(r); setCheckoutOpen(true) }}
-        onStatusChange={updateRoomStatus} />
+        onStatusChange={updateRoomStatus}
+        onEdit={handleEditRoom}
+        onOrderFood={handleOrderFood} />
 
       <CheckInDialog
         open={checkInOpen}
@@ -109,16 +131,24 @@ export function RoomsPanel() {
         room={selectedRoom}
         onDone={() => { setCheckoutOpen(false); load() }}
       />
+      <EditRoomDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        room={selectedRoom}
+        onDone={() => { setEditOpen(false); load() }}
+      />
     </div>
   )
 }
 
-function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, onStatusChange }: {
+function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood }: {
   title: string; subtitle: string; rooms: Room[]
   onSelect: (r: Room) => void
   onCheckIn: (r: Room) => void
   onCheckout: (r: Room) => void
   onStatusChange: (r: Room, s: string) => void
+  onEdit: (r: Room) => void
+  onOrderFood: (r: Room) => void
 }) {
   return (
     <div>
@@ -132,6 +162,8 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
             onCheckIn={() => onCheckIn(room)}
             onCheckout={() => onCheckout(room)}
             onStatusChange={(s) => onStatusChange(room, s)}
+            onEdit={() => onEdit(room)}
+            onOrderFood={() => onOrderFood(room)}
           />
         ))}
       </div>
@@ -139,11 +171,13 @@ function FloorBlock({ title, subtitle, rooms, onSelect, onCheckIn, onCheckout, o
   )
 }
 
-function RoomCard({ room, onCheckIn, onCheckout, onStatusChange }: {
+function RoomCard({ room, onCheckIn, onCheckout, onStatusChange, onEdit, onOrderFood }: {
   room: Room
   onCheckIn: () => void
   onCheckout: () => void
   onStatusChange: (s: string) => void
+  onEdit: () => void
+  onOrderFood?: () => void  // only when occupied
 }) {
   const status = room.status
   const activeCheckIn = room.checkIns[0]
@@ -167,6 +201,16 @@ function RoomCard({ room, onCheckIn, onCheckout, onStatusChange }: {
           <div className="flex items-center gap-1.5">
             <span className={`h-2 w-2 rounded-full ${cfg.dot}`} />
             <span className="text-xs font-medium">{cfg.label}</span>
+            {/* Edit room attributes (rate, type, bed, capacity) */}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 ml-1 opacity-60 hover:opacity-100"
+              onClick={onEdit}
+              title="Edit room details"
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
           </div>
         </div>
 
@@ -202,9 +246,16 @@ function RoomCard({ room, onCheckIn, onCheckout, onStatusChange }: {
             </Button>
           )}
           {status === 'occupied' && activeCheckIn && (
-            <Button size="sm" variant="destructive" className="w-full" onClick={onCheckout}>
-              <LogOut className="h-3.5 w-3.5 mr-1.5" /> Check Out
-            </Button>
+            <>
+              <Button size="sm" variant="destructive" className="w-full" onClick={onCheckout}>
+                <LogOut className="h-3.5 w-3.5 mr-1.5" /> Check Out
+              </Button>
+              {onOrderFood && (
+                <Button size="sm" variant="outline" className="w-full" onClick={onOrderFood}>
+                  <Utensils className="h-3.5 w-3.5 mr-1.5" /> Order Food for Room
+                </Button>
+              )}
+            </>
           )}
           {status === 'cleaning' && (
             <Button size="sm" variant="outline" className="w-full" onClick={() => onStatusChange('available')}>
@@ -545,5 +596,142 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Label className="text-xs">{label}</Label>
       {children}
     </div>
+  )
+}
+
+// ====== Edit Room Dialog — edit rate, type, bed, capacity, status ======
+function EditRoomDialog({ open, onOpenChange, room, onDone }: {
+  open: boolean; onOpenChange: (v: boolean) => void; room: Room | null; onDone: () => void
+}) {
+  const { toast } = useToast()
+  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({
+    number: '', floor: 1, type: 'Standard', ratePerNight: 1500,
+    bedType: 'Double', capacity: 2, status: 'available', notes: '',
+  })
+
+  useEffect(() => {
+    if (open && room) {
+      setForm({
+        number: room.number,
+        floor: room.floor,
+        type: room.type,
+        ratePerNight: room.ratePerNight,
+        bedType: room.bedType,
+        capacity: room.capacity,
+        status: room.status,
+        notes: room.notes || '',
+      })
+    }
+  }, [open, room])
+
+  async function submit() {
+    if (!room) return
+    if (!form.number.trim()) {
+      toast({ title: 'Room number cannot be empty', variant: 'destructive' }); return
+    }
+    setSubmitting(true)
+    try {
+      await apiFetch(`/api/rooms/${room.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          number: form.number.trim(),
+          floor: Number(form.floor),
+          type: form.type,
+          ratePerNight: Number(form.ratePerNight),
+          bedType: form.bedType,
+          capacity: Number(form.capacity),
+          status: form.status,
+          notes: form.notes || null,
+        }),
+      })
+      toast({ title: `Room ${form.number} updated` })
+      onDone()
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e.message, variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (!room) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="h-4 w-4" /> Edit Room {room.number}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-3 py-2">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Room Number">
+              <Input value={form.number} onChange={e => setForm({ ...form, number: e.target.value })} />
+            </Field>
+            <Field label="Floor">
+              <Input type="number" min={1} max={10} value={form.floor} onChange={e => setForm({ ...form, floor: Number(e.target.value) })} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Room Type">
+              <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Standard">Standard</SelectItem>
+                  <SelectItem value="Deluxe">Deluxe</SelectItem>
+                  <SelectItem value="Suite">Suite</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Bed Type">
+              <Select value={form.bedType} onValueChange={v => setForm({ ...form, bedType: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Single">Single</SelectItem>
+                  <SelectItem value="Double">Double</SelectItem>
+                  <SelectItem value="Twin">Twin</SelectItem>
+                  <SelectItem value="King">King</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Rate per Night (₹)">
+              <Input type="number" min={0} step="50" value={form.ratePerNight} onChange={e => setForm({ ...form, ratePerNight: Number(e.target.value) })} />
+            </Field>
+            <Field label="Capacity (guests)">
+              <Input type="number" min={1} max={10} value={form.capacity} onChange={e => setForm({ ...form, capacity: Number(e.target.value) })} />
+            </Field>
+          </div>
+
+          <Field label="Status">
+            <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="occupied">Occupied</SelectItem>
+                <SelectItem value="cleaning">Cleaning</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Field label="Notes (optional)">
+            <Textarea rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="e.g. AC not working, room needs painting" />
+          </Field>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
