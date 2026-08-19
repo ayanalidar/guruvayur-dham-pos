@@ -9,7 +9,7 @@ import { InvoicesPanel } from '@/components/pos/invoices-panel'
 import { LoginScreen } from '@/components/pos/login-screen'
 import { GuardianXBrand } from '@/components/pos/guardianx-brand'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Hotel, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -56,11 +56,19 @@ export default function Home() {
       <aside className="w-16 lg:w-60 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col">
         <div className="p-3 lg:p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <Hotel className="h-5 w-5 text-primary-foreground" />
-            </div>
+            <img
+              src="/gvd-logo.webp"
+              alt="GVD"
+              className="h-10 w-14 object-contain shrink-0"
+              style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
+            />
             <div className="hidden lg:block min-w-0">
-              <p className="text-sm font-bold leading-tight truncate">GuruVayurDham</p>
+              <p
+                className="text-sm font-bold leading-tight truncate"
+                style={{ color: '#FFB3B3', fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                Guruvayur Dham
+              </p>
               <p className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider">Hotel POS</p>
             </div>
           </div>

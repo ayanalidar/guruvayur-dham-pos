@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/use-toast'
-import { Delete, LogIn, Hotel, Shield, Loader2 } from 'lucide-react'
+import { Delete, LogIn, Shield, Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/format'
 import { GuardianXBrand } from './guardianx-brand'
 
@@ -20,7 +20,7 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   useEffect(() => {
     apiFetch<{ config: Config }>('/api/config')
       .then(d => setConfig({ name: d.config.name, posPin: d.config.posPin }))
-      .catch(() => setConfig({ name: 'Hotel GuruVayurDham', posPin: '1234' }))
+      .catch(() => setConfig({ name: 'Hotel Guruvayur Dham', posPin: '1234' }))
       .finally(() => setLoading(false))
   }, [])
 
@@ -69,10 +69,18 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
       <div className="w-full max-w-sm">
         {/* Hotel header */}
         <div className="text-center mb-6">
-          <div className="inline-flex h-16 w-16 rounded-2xl bg-primary items-center justify-center mb-3 shadow-lg shadow-primary/30">
-            <Hotel className="h-9 w-9 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">{config?.name || 'Hotel GuruVayurDham'}</h1>
+          <img
+            src="/gvd-logo.webp"
+            alt="Hotel Guruvayur Dham"
+            className="h-24 w-32 object-contain mx-auto mb-3"
+            style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
+          />
+          <h1
+            className="text-2xl font-bold leading-tight"
+            style={{ color: '#B22222', fontFamily: 'Georgia, "Times New Roman", serif' }}
+          >
+            {config?.name?.toUpperCase() || 'HOTEL GURUVAYUR DHAM'}
+          </h1>
           <p className="text-xs text-muted-foreground mt-1 uppercase tracking-widest">Point of Sale</p>
         </div>
 

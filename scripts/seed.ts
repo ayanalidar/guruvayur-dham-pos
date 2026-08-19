@@ -8,23 +8,35 @@ import { db } from '@/lib/db'
 async function main() {
   console.log('🌱 Seeding Hotel GuruVayurDham POS data...')
 
-  // 1) Hotel config (upsert)
+  // 1) Hotel config (upsert) — details from the actual invoice sample provided by client
+  // (Mathura, UP — not Kerala as previously assumed)
   await db.hotelConfig.upsert({
     where: { id: 'main' },
-    update: {},
-    create: {
-      id: 'main',
-      name: 'Hotel GuruVayurDham',
-      address: 'Guruvayur Temple Road, Guruvayur, Kerala 680101',
-      phone: '+91 487 255 1234',
-      email: 'stay@guruvayurdham.in',
-      gstNumber: '32AAAAA0000A1Z5',
+    update: {
+      name: 'Hotel Guruvayur Dham',
+      address: '88/306 Mali Para, Opp. Pathway Mata Mandir, Dholi Pyau, Mathura, Uttar Pradesh - 281001',
+      phone: '+91 8445555554, +91 9410077786',
+      email: 'Guruvayurdham@gmail.com',
+      gstNumber: '09AABFG2373H1ZG',
       sacCode: '996311',
       cgstRate: 9.0,
       sgstRate: 9.0,
+      posPin: '1234',
+    },
+    create: {
+      id: 'main',
+      name: 'Hotel Guruvayur Dham',
+      address: '88/306 Mali Para, Opp. Pathway Mata Mandir, Dholi Pyau, Mathura, Uttar Pradesh - 281001',
+      phone: '+91 8445555554, +91 9410077786',
+      email: 'Guruvayurdham@gmail.com',
+      gstNumber: '09AABFG2373H1ZG',
+      sacCode: '996311',
+      cgstRate: 9.0,
+      sgstRate: 9.0,
+      posPin: '1234',
     },
   })
-  console.log('✓ Hotel config')
+  console.log('✓ Hotel config (updated with real Mathura UP details)')
 
   // 2) Rooms: 101-107 (Floor 1, Standard/Deluxe), 201-208 (Floor 2, Deluxe/Suite)
   const roomSpecs: { number: string; floor: number; type: string; rate: number; bed: string }[] = [
