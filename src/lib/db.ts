@@ -1,6 +1,5 @@
 import { PrismaClient } from '@prisma/client'
-import fs from 'fs'
-import path from 'path'
+import { SCHEMA_SQL } from './schema-sql'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -22,39 +21,35 @@ export const db = process.env.NODE_ENV === 'production'
 
 // On Vercel (serverless), the SQLite file is ephemeral — it resets on each cold start.
 // This function ensures the DB schema exists AND is seeded on first use.
-// The schema is created by executing the SQL DDL statements directly via Prisma's $executeRawUnsafe.
+// The schema SQL is embedded in the JS bundle (src/lib/schema-sql.ts) so it's always available.
 export async function ensureSeeded() {
   if (globalForPrisma.prismaSeeded) return
 
   // Step 1: Ensure the SQLite schema exists in the DB file.
   if (!globalForPrisma.schemaPushed) {
+    let tableExists = false
     try {
-      // Check if HotelConfig table exists (use a try/catch — if it doesn't exist, the query throws)
-      await db.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='HotelConfig'`
+      const result = await db.$queryRaw`SELECT name FROM sqlite_master WHERE type='table' AND name='HotelConfig'` as any[]
+      tableExists = result && result.length > 0
     } catch {
-      // Table doesn't exist — execute the schema SQL
+      tableExists = false
+    }
+
+    if (!tableExists) {
       try {
-        // Try prisma/schema.sql first, fall back to public/schema.sql (which is always bundled)
-        let schemaPath = path.join(process.cwd(), 'prisma', 'schema.sql')
-        if (!fs.existsSync(schemaPath)) {
-          schemaPath = path.join(process.cwd(), 'public', 'schema.sql')
-        }
-        if (fs.existsSync(schemaPath)) {
-          const sql = fs.readFileSync(schemaPath, 'utf-8')
-          // Split on semicolons, execute each statement (Prisma's $executeRawUnsafe doesn't support multi-statement)
-          const statements = sql
-            .split(/;\s*\n/)
-            .map(s => s.trim())
-            .filter(s => s && !s.startsWith('--'))
-          for (const stmt of statements) {
-            try {
-              await db.$executeRawUnsafe(stmt)
-            } catch (e) {
-              // Statement may fail if table already exists — ignore
-            }
+        // Split SQL on semicolons followed by newline, execute each statement
+        const statements = SCHEMA_SQL
+          .split(/;\s*\n/)
+          .map(s => s.trim())
+          .filter(s => s && !s.startsWith('--'))
+        for (const stmt of statements) {
+          try {
+            await db.$executeRawUnsafe(stmt)
+          } catch (e) {
+            // Statement may fail if table already exists — ignore
           }
-          console.log('[seed] schema created via raw SQL')
         }
+        console.log('[seed] schema created via raw SQL (' + statements.length + ' statements)')
       } catch (e) {
         console.error('[seed] schema creation failed:', e)
       }
