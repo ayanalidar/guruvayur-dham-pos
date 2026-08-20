@@ -61,7 +61,7 @@ function OrderTab({ preselectCheckIn, onConsumed }: {
   const [selectedCheckIn, setSelectedCheckIn] = useState<string>('') // checkInId
   const [customerName, setCustomerName] = useState('Walk-in Guest')
   const [tableNumber, setTableNumber] = useState('')
-  const [cartOpen, setCartOpen] = useState(false) // right-side sheet for current order
+  const [cartOpen, setCartOpen] = useState(true) // right-side sheet — open by default
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -423,7 +423,7 @@ function OrderTab({ preselectCheckIn, onConsumed }: {
                 <Button
                   className="w-full mt-1"
                   disabled={cart.length === 0 || submitting}
-                  onClick={() => { submitOrder(); setCartOpen(false) }}
+                  onClick={() => submitOrder()}
                 >
                   {submitting ? 'Placing order...' : `Place Order (${formatINR(grandTotal)})`}
                 </Button>
