@@ -314,6 +314,17 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
   }, [invoice?.id])
 
   if (!invoice) return null
+  // Guard: form might be null if useEffect hasn't run yet — treat as non-edit mode
+  const safeForm = form || {
+    invoiceNumber: invoice.invoiceNumber, guestName: invoice.guestName, guestPhone: invoice.guestPhone,
+    roomNumber: invoice.roomNumber, roomType: invoice.roomType, checkInAt: '', checkOutAt: '',
+    nights: invoice.nights, ratePerNight: invoice.ratePerNight, roomCharges: invoice.roomCharges,
+    foodCharges: invoice.foodCharges, extraCharges: invoice.extraCharges, discount: invoice.discount,
+    taxableAmount: invoice.taxableAmount, cgstRate: invoice.cgstRate, sgstRate: invoice.sgstRate,
+    cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount, grandTotal: invoice.grandTotal,
+    advancePaid: invoice.advancePaid, balanceDue: invoice.balanceDue, paymentMethod: invoice.paymentMethod || '',
+    notes: invoice.notes || '',
+  }
 
   const foodOrders = invoice.checkIn?.foodOrders || []
 
@@ -410,7 +421,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
         <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
           <InvoiceHeader
             config={config}
-            invoiceNumber={editMode ? form.invoiceNumber : invoice.invoiceNumber}
+            invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
             title="HOTEL INVOICE"
             editableNumber={null}
             onNumberChange={() => {}}
@@ -419,7 +430,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           />
 
           {/* Customer details — editable when in edit mode, dotted leaders otherwise */}
-          {editMode ? (
+          {editMode && form ? (
             <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Guest Name"><Input value={form.guestName} onChange={e => setForm({ ...form, guestName: e.target.value })} className="h-7 text-xs" /></Field>
@@ -481,7 +492,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
               <tr className="border-b border-black">
                 <td className="py-2 px-2 border-r border-black text-center">1</td>
                 <td className="py-2 px-2 border-r border-black">
-                  Room Charges — Room {editMode ? form.roomNumber : invoice.roomNumber} ({editMode ? form.roomType : invoice.roomType})
+                  Room Charges — Room {editMode ? safeForm.roomNumber : invoice.roomNumber} ({editMode ? safeForm.roomType : invoice.roomType})
                   <span className="block text-[10px] text-muted-foreground mt-0.5">
                     {editMode ? `${form.nights} night(s)` : (
                       <>Check-in: {formatDateShort(invoice.checkInAt)} · Check-out: {formatDateShort(invoice.checkOutAt)} · {invoice.nights} night(s)</>
@@ -554,11 +565,11 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
             />
           </div>
 
-          {(editMode ? form.paymentMethod : invoice.paymentMethod) ? (
-            <p className="text-xs mt-3">Payment Method: <strong>{editMode ? form.paymentMethod : invoice.paymentMethod}</strong></p>
+          {(editMode ? safeForm.paymentMethod : invoice.paymentMethod) ? (
+            <p className="text-xs mt-3">Payment Method: <strong>{editMode ? safeForm.paymentMethod : invoice.paymentMethod}</strong></p>
           ) : null}
-          {(editMode ? form.notes : invoice.notes) && (
-            <p className="text-xs mt-1 text-muted-foreground italic">Notes: {editMode ? form.notes : invoice.notes}</p>
+          {(editMode ? safeForm.notes : invoice.notes) && (
+            <p className="text-xs mt-1 text-muted-foreground italic">Notes: {editMode ? safeForm.notes : invoice.notes}</p>
           )}
 
           <InvoiceFooter config={config} />
@@ -621,6 +632,16 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
   }, [invoice?.id])
 
   if (!invoice) return null
+  // Guard: form might be null if useEffect hasn't run yet
+  const safeForm = form || {
+    invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName,
+    roomNumber: invoice.roomNumber || '', tableNumber: invoice.tableNumber || '',
+    orderType: invoice.orderType, itemsTotal: invoice.itemsTotal,
+    cgstRate: invoice.cgstRate, sgstRate: invoice.sgstRate,
+    cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount,
+    grandTotal: invoice.grandTotal, paymentMethod: invoice.paymentMethod || '',
+    notes: invoice.notes || '',
+  }
 
   async function saveInvoiceNumber() {
     if (!invoice) return
@@ -704,7 +725,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
         <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
           <InvoiceHeader
             config={config}
-            invoiceNumber={editMode ? form.invoiceNumber : invoice.invoiceNumber}
+            invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
             title="FOOD INVOICE"
             editableNumber={null}
             onNumberChange={() => {}}
@@ -712,7 +733,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             savingNumber={false}
           />
 
-          {editMode ? (
+          {editMode && form ? (
             <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
@@ -805,11 +826,11 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
           <p className="text-[10px] mt-3 text-muted-foreground">
             Order Ref: <span className="font-mono">{invoice.order.orderNumber}</span>
           </p>
-          {(editMode ? form.paymentMethod : invoice.paymentMethod) ? (
-            <p className="text-xs mt-1">Payment Method: <strong>{editMode ? form.paymentMethod : invoice.paymentMethod}</strong></p>
+          {(editMode ? safeForm.paymentMethod : invoice.paymentMethod) ? (
+            <p className="text-xs mt-1">Payment Method: <strong>{editMode ? safeForm.paymentMethod : invoice.paymentMethod}</strong></p>
           ) : null}
-          {(editMode ? form.notes : invoice.notes) && (
-            <p className="text-xs mt-1 text-muted-foreground italic">Notes: {editMode ? form.notes : invoice.notes}</p>
+          {(editMode ? safeForm.notes : invoice.notes) && (
+            <p className="text-xs mt-1 text-muted-foreground italic">Notes: {editMode ? safeForm.notes : invoice.notes}</p>
           )}
 
           <InvoiceFooter config={config} />
