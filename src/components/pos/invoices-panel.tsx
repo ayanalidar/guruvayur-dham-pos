@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -48,21 +50,23 @@ type Config = {
 }
 
 export function InvoicesPanel() {
-  const [tab, setTab] = useState<'hotel' | 'food'>('hotel')
+  const [tab, setTab] = useState<'hotel' | 'food' | 'custom'>('hotel')
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-xl font-semibold">Invoices</h2>
-        <p className="text-sm text-muted-foreground">Hotel invoices (room billing) and separate Food invoices for kitchen orders.</p>
+        <p className="text-sm text-muted-foreground">Hotel invoices, Food invoices, and Custom invoices for ad-hoc billing.</p>
       </div>
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>
-          <TabsTrigger value="hotel"><Receipt className="h-4 w-4 mr-1.5" /> Hotel Invoices</TabsTrigger>
-          <TabsTrigger value="food"><Utensils className="h-4 w-4 mr-1.5" /> Food Invoices</TabsTrigger>
+          <TabsTrigger value="hotel"><Receipt className="h-4 w-4 mr-1.5" /> Hotel</TabsTrigger>
+          <TabsTrigger value="food"><Utensils className="h-4 w-4 mr-1.5" /> Food</TabsTrigger>
+          <TabsTrigger value="custom"><FileText className="h-4 w-4 mr-1.5" /> Custom</TabsTrigger>
         </TabsList>
         <TabsContent value="hotel" className="mt-4"><HotelInvoicesTab /></TabsContent>
         <TabsContent value="food" className="mt-4"><FoodInvoicesTab /></TabsContent>
+        <TabsContent value="custom" className="mt-4"><CustomInvoicesTab /></TabsContent>
       </Tabs>
     </div>
   )
@@ -1117,5 +1121,365 @@ function WhatsAppIcon({ className = '' }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.366.195 1.881.118.574-.085 1.758-.719 2.006-1.413.247-.694.247-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
     </svg>
+  )
+}
+
+// ====== Custom Invoices Tab ======
+type CustomInvoice = {
+  id: string; invoiceNumber: string; customerName: string; customerPhone: string | null
+  customerAddress: string | null; items: any[]; itemsTotal: number
+  cgstRate: number; sgstRate: number; cgstAmount: number; sgstAmount: number
+  grandTotal: number; discount: number; paymentMethod: string | null; notes: string | null
+  createdAt: string
+}
+
+function CustomInvoicesTab() {
+  const { toast } = useToast()
+  const [invoices, setInvoices] = useState<CustomInvoice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<CustomInvoice | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        const d = await apiFetch<{ invoices: CustomInvoice[] }>('/api/invoices/custom')
+        if (active) { setInvoices(d.invoices); setLoading(false) }
+      } catch (e: any) {
+        if (active) { toast({ title: 'Load failed', description: e.message, variant: 'destructive' }); setLoading(false) }
+      }
+    })()
+    return () => { active = false }
+  }, [toast])
+
+  useEffect(() => {
+    function onUpdated() { setLoading(true); apiFetch<{ invoices: CustomInvoice[] }>('/api/invoices/custom').then(d => { setInvoices(d.invoices); setLoading(false) }).catch(() => setLoading(false)) }
+    window.addEventListener('invoice-updated', onUpdated)
+    return () => window.removeEventListener('invoice-updated', onUpdated)
+  }, [])
+
+  async function view(id: string) {
+    try {
+      const d = await apiFetch<{ invoice: CustomInvoice }>(`/api/invoices/custom/${id}`)
+      setSelected(d.invoice)
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  async function del(inv: CustomInvoice) {
+    if (!confirm(`Delete custom invoice #${inv.invoiceNumber}? This cannot be undone.`)) return
+    try {
+      await apiFetch(`/api/invoices/custom/${inv.id}`, { method: 'DELETE' })
+      toast({ title: 'Custom invoice deleted' })
+      window.dispatchEvent(new CustomEvent('invoice-updated'))
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-muted-foreground">{invoices.length} custom invoice{invoices.length !== 1 ? 's' : ''}</p>
+        <Button size="sm" onClick={() => setShowCreate(true)}>
+          <Plus className="h-4 w-4 mr-1.5" /> New Custom Invoice
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Card key={i} className="animate-pulse h-16" />)}</div>
+      ) : invoices.length === 0 ? (
+        <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <FileText className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          No custom invoices yet. Click "New Custom Invoice" to create one for any purpose — advance payments, misc charges, catering, etc.
+        </CardContent></Card>
+      ) : (
+        <div className="rounded-lg border divide-y">
+          {invoices.map(inv => (
+            <div key={inv.id} className="flex items-center justify-between gap-3 p-3 hover:bg-muted/50 transition">
+              <button onClick={() => view(inv.id)} className="flex-1 text-left min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold">#{inv.invoiceNumber}</span>
+                  <Badge variant="outline" className="text-xs">Custom</Badge>
+                </div>
+                <p className="text-sm mt-0.5 truncate">{inv.customerName} · {inv.items?.length || 0} item(s)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{formatDateShort(inv.createdAt)}</p>
+              </button>
+              <div className="text-right shrink-0 flex items-center gap-2">
+                <span className="font-semibold">{formatINR(inv.grandTotal)}</span>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => del(inv)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <CustomInvoiceCreateDialog open={showCreate} onOpenChange={setShowCreate} onDone={() => { setShowCreate(false); window.dispatchEvent(new CustomEvent('invoice-updated')) }} />
+      <CustomInvoiceDialog invoice={selected} onClose={() => setSelected(null)} />
+    </>
+  )
+}
+
+// ====== Custom Invoice Create Dialog ======
+function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
+  open: boolean; onOpenChange: (v: boolean) => void; onDone: () => void
+}) {
+  const { toast } = useToast()
+  const [config, setConfig] = useState<any>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({
+    customerName: '', customerPhone: '', customerAddress: '',
+    cgstRate: 0, sgstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '',
+  })
+  const [items, setItems] = useState<{ name: string; quantity: number; rate: number }[]>([
+    { name: '', quantity: 1, rate: 0 },
+  ])
+
+  useEffect(() => {
+    if (open) {
+      apiFetch<{ config: any }>('/api/config').then(d => {
+        setConfig(d.config)
+        setForm(f => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9 }))
+      }).catch(() => {})
+      setForm({ customerName: '', customerPhone: '', customerAddress: '', cgstRate: 9, sgstRate: 9, discount: 0, paymentMethod: 'Cash', notes: '' })
+      setItems([{ name: '', quantity: 1, rate: 0 }])
+    }
+  }, [open])
+
+  const itemsTotal = items.reduce((s, it) => s + (it.rate * it.quantity), 0)
+  const taxable = Math.max(0, itemsTotal - (Number(form.discount) || 0))
+  const cgst = Math.round(taxable * (Number(form.cgstRate) || 0)) / 100
+  const sgst = Math.round(taxable * (Number(form.sgstRate) || 0)) / 100
+  const grandTotal = taxable + cgst + sgst
+
+  function updateItem(idx: number, field: string, value: any) {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: field === 'name' ? value : Number(value) || 0 } : it))
+  }
+  function addItem() { setItems(prev => [...prev, { name: '', quantity: 1, rate: 0 }]) }
+  function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)) }
+
+  async function submit() {
+    if (!form.customerName.trim()) { toast({ title: 'Customer name is required', variant: 'destructive' }); return }
+    const validItems = items.filter(it => it.name.trim() && it.rate > 0)
+    if (validItems.length === 0) { toast({ title: 'Add at least one item with a name and price', variant: 'destructive' }); return }
+
+    setSubmitting(true)
+    try {
+      const r = await apiFetch<{ invoice: CustomInvoice }>('/api/invoices/custom', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...form,
+          items: validItems,
+        }),
+      })
+      toast({ title: `Custom invoice #${r.invoice.invoiceNumber} created`, description: formatINR(r.invoice.grandTotal) })
+      onDone()
+    } catch (e: any) {
+      toast({ title: 'Failed', description: e.message, variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" /> New Custom Invoice
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          {/* Customer details */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Customer Name *">
+              <Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} placeholder="Name / Company" />
+            </Field>
+            <Field label="Phone (optional)">
+              <Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} placeholder="+91 ..." />
+            </Field>
+          </div>
+          <Field label="Address (optional)">
+            <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
+          </Field>
+
+          {/* Items builder */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-semibold">Items</Label>
+              <Button size="sm" variant="outline" onClick={addItem}><Plus className="h-3.5 w-3.5 mr-1" /> Add Row</Button>
+            </div>
+            <div className="space-y-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_70px_90px_32px] gap-2 items-center">
+                  <Input placeholder="Item name / description" value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-8 text-xs" />
+                  <Input type="number" min={1} placeholder="Qty" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-8 text-xs" />
+                  <Input type="number" min={0} placeholder="Rate" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-8 text-xs" />
+                  {items.length > 1 && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeItem(idx)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tax + discount */}
+          <div className="grid grid-cols-4 gap-3">
+            <Field label="Discount (₹)">
+              <Input type="number" min={0} value={form.discount} onChange={e => setForm({ ...form, discount: Number(e.target.value) })} className="h-8 text-xs" />
+            </Field>
+            <Field label="CGST %">
+              <Input type="number" step="0.1" min={0} value={form.cgstRate} onChange={e => setForm({ ...form, cgstRate: Number(e.target.value) })} className="h-8 text-xs" />
+            </Field>
+            <Field label="SGST %">
+              <Input type="number" step="0.1" min={0} value={form.sgstRate} onChange={e => setForm({ ...form, sgstRate: Number(e.target.value) })} className="h-8 text-xs" />
+            </Field>
+            <Field label="Payment">
+              <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-8 text-xs w-full border rounded px-1">
+                <option value="Cash">Cash</option>
+                <option value="Card">Card</option>
+                <option value="UPI">UPI</option>
+                <option value="Mixed">Mixed</option>
+              </select>
+            </Field>
+          </div>
+
+          <Field label="Notes (optional)">
+            <Textarea rows={1} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="text-xs" />
+          </Field>
+
+          {/* Live totals */}
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-muted-foreground">Items Total</span><span className="font-mono">{formatINR(itemsTotal)}</span></div>
+            {form.discount > 0 && <div className="flex justify-between text-emerald-700"><span>Discount</span><span className="font-mono">- {formatINR(form.discount)}</span></div>}
+            <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span className="font-mono">{formatINR(taxable)}</span></div>
+            <div className="flex justify-between text-xs"><span className="text-muted-foreground">CGST ({form.cgstRate}%)</span><span className="font-mono">{formatINR(cgst)}</span></div>
+            <div className="flex justify-between text-xs"><span className="text-muted-foreground">SGST ({form.sgstRate}%)</span><span className="font-mono">{formatINR(sgst)}</span></div>
+            <div className="flex justify-between font-bold pt-1 border-t"><span>Grand Total</span><span className="font-mono text-primary">{formatINR(grandTotal)}</span></div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={submit} disabled={submitting}>
+            {submitting ? 'Creating...' : `Create Invoice (${formatINR(grandTotal)})`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ====== Custom Invoice View Dialog (printable) ======
+function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | null; onClose: () => void }) {
+  const [config, setConfig] = useState<Config | null>(null)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    apiFetch<{ config: Config }>('/api/config').then(d => setConfig(d.config)).catch(() => {})
+  }, [])
+
+  if (!invoice) return null
+
+  const items: any[] = invoice.items as any[] || []
+
+  return (
+    <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" /> Custom Invoice #{invoice.invoiceNumber}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
+          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="CUSTOM INVOICE" copyNote="Original" />
+
+          {/* Customer details */}
+          <div className="mt-3 mb-3 space-y-1">
+            <LeaderRow>
+              <LeaderField label="Name" value={invoice.customerName} />
+              <LeaderField label="Mob" value={invoice.customerPhone || '—'} width="w-44" />
+            </LeaderRow>
+            <LeaderRow>
+              <LeaderField label="Address" value={invoice.customerAddress || '—'} />
+              <LeaderField label="Date" value={formatDateShort(invoice.createdAt)} width="w-48" />
+            </LeaderRow>
+          </div>
+
+          {/* Items table */}
+          <table className="w-full text-xs border-collapse border border-black mt-3" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
+            <thead>
+              <tr className="bg-gray-200 border-b border-black">
+                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
+                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '52%' }}>Particulars</th>
+                <th className="text-right py-2 px-2 border-r border-black" style={{ width: '20%' }}>Rate</th>
+                <th className="text-right py-2 px-2" style={{ width: '20%' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it: any, idx: number) => (
+                <tr key={idx} className="border-b border-black">
+                  <td className="py-2 px-2 border-r border-black text-center">{idx + 1}</td>
+                  <td className="py-2 px-2 border-r border-black">{it.name}</td>
+                  <td className="text-right py-2 px-2 border-r border-black font-mono">{it.quantity} × {formatINR(it.rate)}</td>
+                  <td className="text-right py-2 px-2 font-mono">{formatINR(it.amount)}</td>
+                </tr>
+              ))}
+              {invoice.discount > 0 && (
+                <tr className="border-b border-black">
+                  <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Discount</td>
+                  <td className="text-right py-2 px-2 font-mono text-emerald-700">- {formatINR(invoice.discount)}</td>
+                </tr>
+              )}
+              <tr className="border-t-2 border-black font-bold">
+                <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td>
+                <td className="text-right py-2 px-2 font-mono">{formatINR(invoice.itemsTotal - invoice.discount)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Tax breakdown */}
+          <div className="mt-3 flex justify-end">
+            <InvoiceTotals rows={[
+              { label: 'Taxable Amount', value: invoice.itemsTotal - invoice.discount },
+              { label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount },
+              { label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount },
+              { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
+            ]} />
+          </div>
+
+          {invoice.paymentMethod && (
+            <p className="text-xs mt-3">Payment Method: <strong>{invoice.paymentMethod}</strong></p>
+          )}
+          {invoice.notes && <p className="text-xs mt-1 text-muted-foreground italic">Notes: {invoice.notes}</p>}
+
+          <InvoiceFooter config={config} />
+        </div>
+
+        <DialogFooter className="no-print">
+          <Button variant="destructive" onClick={async () => {
+            if (!confirm('Delete this custom invoice permanently?')) return
+            try {
+              await apiFetch(`/api/invoices/custom/${invoice.id}`, { method: 'DELETE' })
+              toast({ title: 'Custom invoice deleted' })
+              window.dispatchEvent(new CustomEvent('invoice-updated'))
+              onClose()
+            } catch (e: any) { toast({ title: 'Delete failed', description: e.message, variant: 'destructive' }) }
+          }}>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </Button>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

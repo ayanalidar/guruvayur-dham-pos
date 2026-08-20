@@ -187,6 +187,26 @@ model FoodInvoice {
   createdAt       DateTime @default(now())
 }
 
+// ----- Custom Invoices (manual / ad-hoc) -----
+model CustomInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  customerName    String
+  customerPhone   String?
+  customerAddress String?
+  items           Json     // [{ name, quantity, rate, amount }]
+  itemsTotal      Float
+  cgstRate        Float    @default(0)
+  sgstRate        Float    @default(0)
+  cgstAmount      Float    @default(0)
+  sgstAmount      Float    @default(0)
+  grandTotal      Float
+  discount        Float    @default(0)
+  paymentMethod   String?
+  notes           String?
+  createdAt       DateTime @default(now())
+}
+
 // ----- Reservations (future bookings) -----
 model Reservation {
   id              String   @id @default(cuid())
