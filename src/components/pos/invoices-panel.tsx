@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw, Maximize2 } from 'lucide-react'
+import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, formatTime, apiFetch } from '@/lib/format'
 import { QrCode } from './qr-code'
 
@@ -268,7 +268,6 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
   const [editMode, setEditMode] = useState(false)
   const [editedNumber, setEditedNumber] = useState('')
   const [saving, setSaving] = useState(false)
-  const [fullScreen, setFullScreen] = useState(false)
   // Full-edit form state
   const [form, setForm] = useState<any>(null)
 
@@ -281,7 +280,6 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
     if (invoice) {
       setEditMode(false)
       setEditedNumber(invoice.invoiceNumber)
-      setFullScreen(false)
       // Build editable form from invoice data
       setForm({
         invoiceNumber: invoice.invoiceNumber,
@@ -381,7 +379,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -564,116 +562,9 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button variant="outline" onClick={() => setFullScreen(true)}>
-            <Maximize2 className="h-4 w-4 mr-2" /> Full Screen
-          </Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
-
-      {/* Full-screen landscape preview */}
-      {fullScreen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setFullScreen(false)}>
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white border-b p-2 flex justify-end gap-2 z-10">
-              <Button variant="outline" size="sm" onClick={() => window.print()}>
-                <Printer className="h-4 w-4 mr-2" /> Print
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setFullScreen(false)}>
-                <X className="h-4 w-4" /> Close
-              </Button>
-            </div>
-            <div className="invoice-print p-8" style={{ maxWidth: '1100px', margin: '0 auto' }}>
-              <InvoiceHeader
-                config={config}
-                invoiceNumber={editMode ? form.invoiceNumber : invoice.invoiceNumber}
-                title="HOTEL INVOICE"
-                editableNumber={null}
-                onNumberChange={() => {}}
-                onEditClick={undefined}
-                savingNumber={false}
-              />
-              {/* Customer grid */}
-              {editMode ? (
-                <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
-                  <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Guest Name"><Input value={form.guestName} onChange={e => setForm({ ...form, guestName: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Guest Phone"><Input value={form.guestPhone} onChange={e => setForm({ ...form, guestPhone: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Room Number"><Input value={form.roomNumber} onChange={e => setForm({ ...form, roomNumber: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Check-in"><Input type="datetime-local" value={form.checkInAt} onChange={e => setForm({ ...form, checkInAt: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Check-out"><Input type="datetime-local" value={form.checkOutAt} onChange={e => setForm({ ...form, checkOutAt: e.target.value })} className="h-7 text-xs" /></Field>
-                  <Field label="Rate/Night (₹)"><Input type="number" value={form.ratePerNight} onChange={e => setForm(recompute({ ...form, ratePerNight: Number(e.target.value), roomCharges: Number(e.target.value) * (Number(form.nights) || 1) }))} className="h-7 text-xs" /></Field>
-                  <Field label="Discount (₹)"><Input type="number" value={form.discount} onChange={e => setForm(recompute({ ...form, discount: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-                  <Field label="Extra (₹)"><Input type="number" value={form.extraCharges} onChange={e => setForm(recompute({ ...form, extraCharges: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-                  <Field label="Advance (₹)"><Input type="number" value={form.advancePaid} onChange={e => setForm(recompute({ ...form, advancePaid: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-                  <Field label="CGST %"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-                  <Field label="SGST %"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-                  <Field label="Payment">
-                    <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
-                      <option value="">—</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Card">Card</option>
-                      <option value="UPI">UPI</option>
-                      <option value="Mixed">Mixed</option>
-                    </select>
-                  </Field>
-                  <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
-                </div>
-              ) : (
-                <div className="mt-3 mb-3 space-y-1">
-                  <LeaderRow>
-                    <LeaderField label="Name" value={invoice.guestName} />
-                    <LeaderField label="Mob" value={invoice.guestPhone} width="w-44" />
-                  </LeaderRow>
-                  <LeaderRow>
-                    <LeaderField label="A/D Date" value={formatDateShort(invoice.checkInAt)} width="w-40" />
-                    <LeaderField label="Time" value={formatTime(invoice.checkInAt)} width="w-32" />
-                    <LeaderField label="D/I Date" value={formatDateShort(invoice.checkOutAt)} width="w-40" />
-                    <LeaderField label="Time" value={formatTime(invoice.checkOutAt)} width="w-32" />
-                  </LeaderRow>
-                  <LeaderRow>
-                    <LeaderField label="Address" value={`Room ${invoice.roomNumber} (${invoice.roomType})`} />
-                    <LeaderField label="GSTIN" value="—" width="w-48" />
-                  </LeaderRow>
-                </div>
-              )}
-              {/* Table + totals + footer — same as the dialog version */}
-              <table className="w-full text-xs border-collapse border border-black mt-3" style={{ fontFamily: 'Arial, sans-serif' }}>
-                <thead><tr className="bg-gray-200 border-b border-black"><th className="text-left py-2 px-2 border-r border-black" style={{width:'8%'}}>Sr. No</th><th className="text-left py-2 px-2 border-r border-black" style={{width:'52%'}}>Particulars</th><th className="text-right py-2 px-2 border-r border-black" style={{width:'20%'}}>Rate / Day</th><th className="text-right py-2 px-2" style={{width:'20%'}}>Amount</th></tr></thead>
-                <tbody>
-                  <tr className="border-b border-black"><td className="py-2 px-2 border-r border-black text-center">1</td><td className="py-2 px-2 border-r border-black">Room Charges — Room {editMode ? form.roomNumber : invoice.roomNumber} ({editMode ? form.roomType : invoice.roomType})</td><td className="text-right py-2 px-2 border-r border-black font-mono">{formatINR(editMode ? Number(form.ratePerNight) || 0 : invoice.ratePerNight)}</td><td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.roomCharges) || 0 : invoice.roomCharges)}</td></tr>
-                  {foodOrders.map((fo, idx) => (<tr key={fo.id} className="border-b border-black"><td className="py-2 px-2 border-r border-black text-center">{idx + 2}</td><td className="py-2 px-2 border-r border-black">Food Order — {fo.orderNumber}<ul className="mt-0.5 ml-2 text-[10px] text-muted-foreground" style={{listStyleType:'none'}}>{fo.items.map(it => <li key={it.id}>· {it.quantity}× {it.name} — {formatINR(it.total)}</li>)}</ul></td><td className="text-right py-2 px-2 border-r border-black font-mono text-muted-foreground">—</td><td className="text-right py-2 px-2 font-mono">{formatINR(fo.grandTotal)}</td></tr>))}
-                  <tr className="border-t-2 border-black font-bold"><td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td><td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.taxableAmount) || 0 : invoice.taxableAmount)}</td></tr>
-                </tbody>
-              </table>
-              <div className="mt-3 flex justify-end">
-                <InvoiceTotals rows={editMode ? [
-                  { label: 'Taxable Amount', value: Number(form.taxableAmount) || 0 },
-                  { label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) || 0 },
-                  { label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) || 0 },
-                  { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
-                  { label: 'Advance Paid', value: -(Number(form.advancePaid) || 0), muted: true, emerald: true },
-                  { label: 'Balance Due', value: Number(form.balanceDue) || 0, bold: true, primary: true },
-                ] : [
-                  { label: 'Taxable Amount', value: invoice.taxableAmount },
-                  { label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount },
-                  { label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount },
-                  { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
-                  { label: 'Advance Paid', value: -invoice.advancePaid, muted: true, emerald: true },
-                  { label: 'Balance Due', value: invoice.balanceDue, bold: true, primary: true },
-                ]} />
-              </div>
-              {editMode && (
-                <div className="mt-4 flex justify-end gap-2 no-print">
-                  <Button size="sm" variant="ghost" onClick={() => setFullScreen(false)}>Cancel</Button>
-                  <Button size="sm" onClick={() => { saveFullEdit(); setFullScreen(false) }}><Save className="h-3.5 w-3.5 mr-1.5" /> Save Changes</Button>
-                </div>
-              )}
-              <InvoiceFooter config={config} />
-            </div>
-          </div>
-        </div>
-      )}
     </Dialog>
   )
 }
@@ -684,7 +575,6 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
   const [editMode, setEditMode] = useState(false)
   const [editedNumber, setEditedNumber] = useState('')
   const [saving, setSaving] = useState(false)
-  const [fullScreen, setFullScreen] = useState(false)
   const [form, setForm] = useState<any>(null)
 
   useEffect(() => {
@@ -695,7 +585,6 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
     if (invoice) {
       setEditMode(false)
       setEditedNumber(invoice.invoiceNumber)
-      setFullScreen(false)
       setForm({
         invoiceNumber: invoice.invoiceNumber,
         customerName: invoice.customerName,
@@ -772,7 +661,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -911,9 +800,6 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button variant="outline" onClick={() => setFullScreen(true)}>
-            <Maximize2 className="h-4 w-4 mr-2" /> Full Screen
-          </Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>

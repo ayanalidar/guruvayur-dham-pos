@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Minus, Trash2, ShoppingCart, Utensils, Search, Leaf, Drumstick, CheckCircle2, X, Pencil } from 'lucide-react'
 import { formatINR, apiFetch } from '@/lib/format'
@@ -61,7 +60,6 @@ function OrderTab({ preselectCheckIn, onConsumed }: {
   const [selectedCheckIn, setSelectedCheckIn] = useState<string>('') // checkInId
   const [customerName, setCustomerName] = useState('Walk-in Guest')
   const [tableNumber, setTableNumber] = useState('')
-  const [cartOpen, setCartOpen] = useState(true) // right-side sheet — open by default
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -209,229 +207,189 @@ function OrderTab({ preselectCheckIn, onConsumed }: {
   const cartItemCount = cart.reduce((s, c) => s + c.quantity, 0)
 
   return (
-    <div className="space-y-3">
-      {/* Search + filter */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search dishes..." value={search} onChange={e => setSearch(e.target.value)} />
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] gap-4">
+      {/* Left: menu */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" placeholder="Search dishes..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {categories.map(c => <SelectItem key={c} value={c}>{c === 'all' ? 'All Categories' : c}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {categories.map(c => <SelectItem key={c} value={c}>{c === 'all' ? 'All Categories' : c}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {/* Floating cart button — opens the right-side drawer */}
-        <Button
-          onClick={() => setCartOpen(true)}
-          className="relative shrink-0"
-          disabled={cart.length === 0}
-        >
-          <ShoppingCart className="h-4 w-4 mr-2" />
-          Current Order
-          {cartItemCount > 0 && (
-            <span className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white text-primary text-xs font-bold flex items-center justify-center border-2 border-primary">
-              {cartItemCount}
-            </span>
-          )}
-        </Button>
+
+        <ScrollArea className="h-[calc(100vh-220px)] pr-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 pr-2">
+            {filteredMenu.map(m => {
+              const inCart = cart.find(c => c.menuItemId === m.id)
+              return (
+                <div
+                  key={m.id}
+                  className={`rounded-lg border bg-card p-3 transition ${!m.available ? 'opacity-40' : 'hover:border-primary hover:shadow-sm'} ${inCart ? 'border-primary ring-1 ring-primary/30' : ''}`}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <p className="text-sm font-medium leading-tight">{m.name}</p>
+                    <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border ${m.isVeg ? 'border-emerald-500' : 'border-rose-500'}`}>
+                      {m.isVeg ? <Leaf className="h-2.5 w-2.5 text-emerald-500" /> : <Drumstick className="h-2.5 w-2.5 text-rose-500" />}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-muted-foreground">{m.category}</span>
+                    <span className="text-sm font-semibold">{formatINR(m.price)}</span>
+                  </div>
+                  {/* +/- controls — directly on the menu item */}
+                  {m.available && (
+                    <div className="mt-2 flex items-center justify-center gap-2">
+                      {inCart ? (
+                        <>
+                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateQty(m.id, -1)}>
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="font-bold text-sm w-6 text-center">{inCart.quantity}</span>
+                          <Button size="icon" className="h-7 w-7" onClick={() => updateQty(m.id, +1)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="outline" className="w-full h-7" onClick={() => addToCart(m)}>
+                          <Plus className="h-3 w-3 mr-1" /> Add
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
       </div>
 
-      {/* Menu grid — full width, with +/- buttons on each item */}
-      <ScrollArea className="h-[calc(100vh-200px)] pr-3">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pr-2">
-          {filteredMenu.map(m => {
-            const inCart = cart.find(c => c.menuItemId === m.id)
-            return (
-              <div
-                key={m.id}
-                className={`rounded-lg border bg-card p-3 transition ${!m.available ? 'opacity-40' : 'hover:border-primary hover:shadow-sm'} ${inCart ? 'border-primary ring-1 ring-primary/30' : ''}`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <p className="text-sm font-medium leading-tight">{m.name}</p>
-                  <span className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded-sm border ${m.isVeg ? 'border-emerald-500' : 'border-rose-500'}`}>
-                    {m.isVeg ? <Leaf className="h-2.5 w-2.5 text-emerald-500" /> : <Drumstick className="h-2.5 w-2.5 text-rose-500" />}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-muted-foreground">{m.category}</span>
-                  <span className="text-sm font-semibold">{formatINR(m.price)}</span>
-                </div>
-                {/* +/- controls — directly on the menu item */}
-                {m.available && (
-                  <div className="mt-2 flex items-center justify-center gap-2">
-                    {inCart ? (
-                      <>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-7 w-7"
-                          onClick={() => updateQty(m.id, -1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="font-bold text-sm w-6 text-center">{inCart.quantity}</span>
-                        <Button
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateQty(m.id, +1)}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full h-7"
-                        onClick={() => addToCart(m)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Add
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Right-side Sheet drawer — Current Order */}
-      <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto p-0">
-          <SheetHeader className="pb-2 sticky top-0 bg-background z-10 border-b">
-            <SheetTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-4 w-4" /> Current Order
-              {cartItemCount > 0 && (
-                <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
-                  {cartItemCount} item{cartItemCount !== 1 ? 's' : ''}
-                </span>
-              )}
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="p-4 space-y-3">
-            {/* Order meta */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Order Type">
-                  <Select value={orderType} onValueChange={(v) => setOrderType(v as any)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dine_in">Dine In</SelectItem>
-                      <SelectItem value="room_service">Room Service</SelectItem>
-                      <SelectItem value="takeaway">Takeaway</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Payment">
-                  <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="separate">Separate Bill</SelectItem>
-                      <SelectItem value="room_account">Room Account</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-
-              {paymentMode === 'room_account' && (
-                <Field label="Charge to Room (Check-in)">
-                  <Select value={selectedCheckIn} onValueChange={setSelectedCheckIn}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select active check-in" /></SelectTrigger>
-                    <SelectContent>
-                      {checkIns.length === 0 && <SelectItem value="" disabled>No active check-ins</SelectItem>}
-                      {checkIns.map(ci => (
-                        <SelectItem key={ci.id} value={ci.id}>
-                          Rm {ci.room.number} · {ci.guest.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-
-              {paymentMode === 'separate' && (
-                <Field label="Customer Name">
-                  <Input value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-xs" />
-                </Field>
-              )}
-
-              {orderType === 'dine_in' && (
-                <Field label="Table Number">
-                  <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="T1, T2..." className="h-8 text-xs" />
-                </Field>
-              )}
+      {/* Right: Current Order — always visible, side by side with menu */}
+      <Card className="h-[calc(100vh-150px)] flex flex-col">
+        <CardHeader className="pb-2 shrink-0">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4" /> Current Order
+            {cartItemCount > 0 && (
+              <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
+                {cartItemCount}
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex flex-col overflow-hidden p-3 pt-0">
+          {/* Order meta */}
+          <div className="space-y-2 mb-2 shrink-0">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Order Type">
+                <Select value={orderType} onValueChange={(v) => setOrderType(v as any)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dine_in">Dine In</SelectItem>
+                    <SelectItem value="room_service">Room Service</SelectItem>
+                    <SelectItem value="takeaway">Takeaway</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Payment">
+                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as any)}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="separate">Separate Bill</SelectItem>
+                    <SelectItem value="room_account">Room Account</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
 
-            {/* Cart items */}
-            <div className="border-t pt-3">
-              {cart.length === 0 ? (
-                <div className="text-center py-10 text-sm text-muted-foreground">
-                  <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                  Tap + on menu items to add them here
-                </div>
-              ) : (
-                <ul className="space-y-1.5">
-                  {cart.map(c => (
-                    <li key={c.menuItemId} className="flex items-center gap-2 rounded-md border p-2 text-sm bg-background">
-                      <span className={`shrink-0 inline-flex items-center justify-center w-3 h-3 rounded-sm border ${c.isVeg ? 'border-emerald-500' : 'border-rose-500'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-xs font-medium">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatINR(c.price)} × {c.quantity}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQty(c.menuItemId, -1)}>
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="font-bold text-xs w-5 text-center">{c.quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQty(c.menuItemId, +1)}>
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => setQty(c.menuItemId, 0)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Totals + submit */}
-            {cart.length > 0 && (
-              <div className="border-t pt-3 space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Items Total</span>
-                  <span className="font-mono">{formatINR(itemsTotal)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">CGST 9%</span>
-                  <span className="font-mono">{formatINR(cgst)}</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">SGST 9%</span>
-                  <span className="font-mono">{formatINR(sgst)}</span>
-                </div>
-                <div className="flex justify-between font-semibold pt-1 border-t">
-                  <span>Grand Total</span>
-                  <span className="font-mono text-primary">{formatINR(grandTotal)}</span>
-                </div>
-                <Textarea rows={1} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Order notes..." className="text-xs mt-2" />
-                <Button
-                  className="w-full mt-1"
-                  disabled={cart.length === 0 || submitting}
-                  onClick={() => submitOrder()}
-                >
-                  {submitting ? 'Placing order...' : `Place Order (${formatINR(grandTotal)})`}
-                </Button>
-              </div>
+            {paymentMode === 'room_account' && (
+              <Field label="Charge to Room">
+                <Select value={selectedCheckIn} onValueChange={setSelectedCheckIn}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select check-in" /></SelectTrigger>
+                  <SelectContent>
+                    {checkIns.length === 0 && <SelectItem value="" disabled>No active check-ins</SelectItem>}
+                    {checkIns.map(ci => (
+                      <SelectItem key={ci.id} value={ci.id}>Rm {ci.room.number} · {ci.guest.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            {paymentMode === 'separate' && (
+              <Field label="Customer Name">
+                <Input value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-8 text-xs" />
+              </Field>
+            )}
+            {orderType === 'dine_in' && (
+              <Field label="Table Number">
+                <Input value={tableNumber} onChange={e => setTableNumber(e.target.value)} placeholder="T1, T2..." className="h-8 text-xs" />
+              </Field>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+
+          {/* Cart items */}
+          <div className="flex-1 overflow-y-auto -mx-1 px-1 border-t pt-2">
+            {cart.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                Tap + on menu items to add
+              </div>
+            ) : (
+              <ul className="space-y-1.5">
+                {cart.map(c => (
+                  <li key={c.menuItemId} className="flex items-center gap-2 rounded-md border p-2 text-sm bg-background">
+                    <span className={`shrink-0 inline-flex items-center justify-center w-3 h-3 rounded-sm border ${c.isVeg ? 'border-emerald-500' : 'border-rose-500'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-xs font-medium">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatINR(c.price)} × {c.quantity}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQty(c.menuItemId, -1)}>
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <span className="font-bold text-xs w-5 text-center">{c.quantity}</span>
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQty(c.menuItemId, +1)}>
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => setQty(c.menuItemId, 0)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Totals + submit — fixed at bottom of card */}
+          <div className="shrink-0 mt-2 pt-2 border-t space-y-1">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Items Total</span>
+              <span className="font-mono">{formatINR(itemsTotal)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">CGST 9%</span>
+              <span className="font-mono">{formatINR(cgst)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">SGST 9%</span>
+              <span className="font-mono">{formatINR(sgst)}</span>
+            </div>
+            <div className="flex justify-between font-semibold pt-1 border-t">
+              <span>Grand Total</span>
+              <span className="font-mono text-primary">{formatINR(grandTotal)}</span>
+            </div>
+            <Textarea rows={1} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Order notes..." className="text-xs mt-1" />
+            <Button className="w-full mt-1" disabled={cart.length === 0 || submitting} onClick={submitOrder}>
+              {submitting ? 'Placing order...' : `Place Order (${formatINR(grandTotal)})`}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
