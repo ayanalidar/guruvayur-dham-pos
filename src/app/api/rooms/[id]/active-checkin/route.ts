@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/rooms/[roomId]/active-checkin
+// GET /api/rooms/[id]/active-checkin
 // Returns the active check-in for this room (if any).
 // Used by the public QR menu page to auto-link guest orders to their check-in.
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ roomId: string }> }) {
-  const { roomId } = await params
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
 
   const checkIn = await db.checkIn.findFirst({
-    where: { roomId, status: 'active' },
+    where: { roomId: id, status: 'active' },
     include: {
       guest: { select: { name: true, phone: true } },
       room: { select: { number: true, type: true } },
