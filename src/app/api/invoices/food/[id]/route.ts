@@ -45,3 +45,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const invoice = await db.foodInvoice.update({ where: { id }, data: data as any })
   return NextResponse.json({ invoice })
 }
+
+// DELETE /api/invoices/food/[id] — permanently delete a food invoice
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  try {
+    await db.foodInvoice.delete({ where: { id } })
+    return NextResponse.json({ deleted: true })
+  } catch {
+    return NextResponse.json({ error: 'Invoice not found or could not be deleted' }, { status: 404 })
+  }
+}

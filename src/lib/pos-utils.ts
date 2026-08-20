@@ -1,24 +1,20 @@
 import { db } from '@/lib/db'
 
-// Generate sequential invoice/order numbers like HOT-2026-0001, FOO-2026-0001, ORD-2026-0001
-// Uses a retry loop to handle race conditions on Vercel serverless (concurrent requests
-// generating the same number).
+// Generate simple sequential numbers: 1, 2, 3, 4, 5...
+// Same counter shared across all invoice types for simplicity.
+// Uses a retry loop to handle race conditions on Vercel serverless.
 export async function generateNumber(prefix: 'HOT' | 'FOO' | 'ORD'): Promise<string> {
-  const year = new Date().getFullYear()
-  const yearStr = String(year)
-
   for (let attempt = 0; attempt < 5; attempt++) {
     let count = 0
     if (prefix === 'HOT') {
-      count = await db.hotelInvoice.count({ where: { invoiceNumber: { startsWith: `HOT-${yearStr}-` } } })
+      count = await db.hotelInvoice.count()
     } else if (prefix === 'FOO') {
-      count = await db.foodInvoice.count({ where: { invoiceNumber: { startsWith: `FOO-${yearStr}-` } } })
+      count = await db.foodInvoice.count()
     } else {
-      count = await db.foodOrder.count({ where: { orderNumber: { startsWith: `ORD-${yearStr}-` } } })
+      count = await db.foodOrder.count()
     }
-    // Add attempt offset to avoid collision with concurrent requests
-    const seq = (count + 1 + attempt).toString().padStart(4, '0')
-    const candidate = `${prefix}-${yearStr}-${seq}`
+
+    const candidate = String(count + 1 + attempt)
 
     // Check if this number already exists
     let exists = false
@@ -31,12 +27,10 @@ export async function generateNumber(prefix: 'HOT' | 'FOO' | 'ORD'): Promise<str
     }
 
     if (!exists) return candidate
-    // If it exists, try the next number
   }
 
   // Fallback: use timestamp to guarantee uniqueness
-  const ts = Date.now().toString().slice(-6)
-  return `${prefix}-${yearStr}-${ts}`
+  return String(Date.now())
 }
 
 export function formatINR(n: number): string {

@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw } from 'lucide-react'
+import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw, Trash2 } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, formatTime, apiFetch } from '@/lib/format'
 import { QrCode } from './qr-code'
 
@@ -379,7 +379,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -403,7 +403,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           </DialogTitle>
         </DialogHeader>
 
-        <div className="invoice-print bg-white p-2">
+        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? form.invoiceNumber : invoice.invoiceNumber}
@@ -464,7 +464,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           )}
 
           {/* Itemized table */}
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif' }}>
+          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
             <thead>
               <tr className="bg-gray-200 border-b border-black">
                 <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
@@ -561,6 +561,19 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
         </div>
 
         <DialogFooter className="no-print">
+          <Button variant="destructive" onClick={async () => {
+            if (!confirm('Delete this hotel invoice permanently? This cannot be undone.')) return
+            try {
+              await apiFetch(`/api/invoices/hotel/${invoice.id}`, { method: 'DELETE' })
+              toast({ title: 'Invoice deleted' })
+              window.dispatchEvent(new CustomEvent('invoice-updated'))
+              onClose()
+            } catch (e: any) {
+              toast({ title: 'Delete failed', description: e.message, variant: 'destructive' })
+            }
+          }}>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
@@ -661,7 +674,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -684,7 +697,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="invoice-print bg-white p-2">
+        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? form.invoiceNumber : invoice.invoiceNumber}
@@ -742,7 +755,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             </div>
           )}
 
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif' }}>
+          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
             <thead>
               <tr className="bg-gray-200 border-b border-black">
                 <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
@@ -799,6 +812,19 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
         </div>
 
         <DialogFooter className="no-print">
+          <Button variant="destructive" onClick={async () => {
+            if (!confirm('Delete this food invoice permanently? This cannot be undone.')) return
+            try {
+              await apiFetch(`/api/invoices/food/${invoice.id}`, { method: 'DELETE' })
+              toast({ title: 'Food invoice deleted' })
+              window.dispatchEvent(new CustomEvent('invoice-updated'))
+              onClose()
+            } catch (e: any) {
+              toast({ title: 'Delete failed', description: e.message, variant: 'destructive' })
+            }
+          }}>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
           <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
