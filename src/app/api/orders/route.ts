@@ -56,12 +56,42 @@ export async function POST(req: NextRequest) {
   const safeTableNumber = tableNumber ? String(tableNumber).trim().slice(0, 10) : null
   const safeNotes = notes ? String(notes).trim().slice(0, 1000) : null
 
-  // if room_account, ensure a valid active check-in exists
-  if (safePaymentMode === 'room_account') {
-    if (!checkInId) return NextResponse.json({ error: 'checkInId required for room_account' }, { status: 400 })
-    const ci = await db.checkIn.findUnique({ where: { id: String(checkInId) } })
+  // if room_account, ensure a valid active check-in exists.
+  // If no checkInId provided but roomNumber is set, try to auto-find the active check-in
+  // for that room (supports QR-code ordering from room service).
+  let finalCheckInId = checkInId ? String(checkInId) : null
+  let finalPaymentMode = safePaymentMode
+
+  if (safePaymentMode === 'room_account' && !finalCheckInId) {
+    // Try to auto-find by room number
+    if (safeRoomNumber) {
+      const room = await db.room.findFirst({ where: { number: safeRoomNumber } })
+      if (room) {
+        const ci = await db.checkIn.findFirst({
+          where: { roomId: room.id, status: 'active' },
+          orderBy: { checkInAt: 'desc' },
+        })
+        if (ci) {
+          finalCheckInId = ci.id
+        } else {
+          // No active check-in — fall back to separate bill so order isn't blocked
+          finalPaymentMode = 'separate'
+        }
+      } else {
+        return NextResponse.json({ error: 'Room not found for room_account order' }, { status: 400 })
+      }
+    } else {
+      return NextResponse.json({ error: 'checkInId or roomNumber required for room_account' }, { status: 400 })
+    }
+  }
+
+  // Verify the check-in if one was provided/found
+  if (finalCheckInId) {
+    const ci = await db.checkIn.findUnique({ where: { id: finalCheckInId } })
     if (!ci || ci.status !== 'active') {
-      return NextResponse.json({ error: 'Active check-in not found' }, { status: 400 })
+      // Check-in no longer active — fall back to separate bill
+      finalCheckInId = null
+      finalPaymentMode = 'separate'
     }
   }
 
@@ -92,12 +122,12 @@ export async function POST(req: NextRequest) {
   const order = await db.foodOrder.create({
     data: {
       orderNumber,
-      checkInId: safePaymentMode === 'room_account' ? String(checkInId) : null,
+      checkInId: finalCheckInId,
       customerName: safeCustomerName,
       roomNumber: safeRoomNumber,
       tableNumber: safeTableNumber,
       orderType: safeOrderType,
-      paymentMode: safePaymentMode,
+      paymentMode: finalPaymentMode,
       status: 'pending',
       itemsTotal,
       cgstAmount,

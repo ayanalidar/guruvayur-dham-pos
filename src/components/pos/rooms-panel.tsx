@@ -1032,7 +1032,7 @@ function RoomQRDialog({ open, onOpenChange, room }: {
             <QrIcon className="h-4 w-4" /> Room {room.number} — Menu QR Code
           </DialogTitle>
           <DialogDescription>
-            Display this QR code in the room. Guests scan it with their phone to view the menu and call the front desk to order.
+            Display this QR code in the room. Guests scan it with their phone to view the menu and place orders directly — orders appear instantly in the Kitchen and Orders tabs.
           </DialogDescription>
         </DialogHeader>
 

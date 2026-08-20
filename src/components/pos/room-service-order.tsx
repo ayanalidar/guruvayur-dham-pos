@@ -37,6 +37,20 @@ export function RoomServiceOrder({ roomId, room, menu, config }: {
   const [category, setCategory] = useState<string>('all')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  // Auto-detect who's currently checked into this room
+  const [activeCheckIn, setActiveCheckIn] = useState<{ id: string; guestName: string } | null>(null)
+
+  // Fetch the active check-in for this room on mount
+  useEffect(() => {
+    apiFetch<{ found: boolean; checkIn?: { id: string; guestName: string } }>(`/api/rooms/${roomId}/active-checkin`)
+      .then(d => {
+        if (d.found && d.checkIn) {
+          setActiveCheckIn({ id: d.checkIn.id, guestName: d.checkIn.guestName })
+          setCustomerName(d.checkIn.guestName)
+        }
+      })
+      .catch(() => {})
+  }, [roomId])
 
   // Group by category
   const categories = Array.from(new Set(menu.map(m => m.category))).sort()
@@ -74,15 +88,18 @@ export function RoomServiceOrder({ roomId, room, menu, config }: {
     }
     setSubmitting(true)
     try {
-      // POST to /api/orders with paymentMode=room_account, orderType=room_service
+      // If we found an active check-in for this room, link the order to it (room_account).
+      // If no check-in (room not occupied), still place the order as 'separate' bill
+      // so the guest's order isn't blocked — staff can handle payment at the desk.
+      const hasCheckIn = !!activeCheckIn
       await apiFetch('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
-          checkInId: null, // walk-in order from QR — staff will link to check-in
+          checkInId: hasCheckIn ? activeCheckIn!.id : null,
           customerName: customerName || `Room ${room.number} Guest`,
           roomNumber: room.number,
           orderType: 'room_service',
-          paymentMode: 'room_account',
+          paymentMode: hasCheckIn ? 'room_account' : 'separate',
           notes: notes || undefined,
           items: cart.map(c => ({
             menuItemId: c.menuItemId,
@@ -95,7 +112,8 @@ export function RoomServiceOrder({ roomId, room, menu, config }: {
       setSuccess(true)
       setCart([])
       setNotes('')
-      setCustomerName('')
+      // Keep the guest name if we found a check-in
+      if (!hasCheckIn) setCustomerName('')
     } catch (e: any) {
       toast({ title: 'Order failed', description: e.message, variant: 'destructive' })
     } finally {
@@ -110,7 +128,10 @@ export function RoomServiceOrder({ roomId, room, menu, config }: {
           <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto mb-3" />
           <h2 className="text-lg font-bold text-emerald-800">Order Placed!</h2>
           <p className="text-sm text-emerald-700 mt-2">
-            Your order has been sent to the kitchen. It will be delivered to Room {room.number} shortly.
+            Your order has been sent to the kitchen and will be delivered to Room {room.number} shortly.
+          </p>
+          <p className="text-xs text-emerald-600 mt-1">
+            {activeCheckIn ? 'The order has been added to your room bill.' : 'Please pay at the front desk when your food arrives.'}
           </p>
           <Button
             className="mt-4"
@@ -125,6 +146,21 @@ export function RoomServiceOrder({ roomId, room, menu, config }: {
 
   return (
     <div>
+      {/* Guest info banner — shows who's checked in (or if room is empty) */}
+      {activeCheckIn ? (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2.5 mb-3 text-xs">
+          <p className="font-semibold text-emerald-800">
+            ✓ Welcome, {activeCheckIn.guestName}! Orders will be added to your room bill.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 mb-3 text-xs">
+          <p className="font-semibold text-amber-800">
+            ⚠ Room {room.number} is not currently checked in. Your order will be billed separately — please pay at the front desk.
+          </p>
+        </div>
+      )}
+
       {/* Search + category filter */}
       <div className="sticky top-[68px] z-10 bg-amber-50/95 backdrop-blur-sm py-2 mb-3 space-y-2">
         <Input
