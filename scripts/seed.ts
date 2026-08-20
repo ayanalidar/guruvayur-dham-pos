@@ -48,31 +48,42 @@ async function main() {
   })
   console.log('✓ Hotel config (updated with real Mathura UP details)')
 
-  // 2) Rooms: 101-107 (Floor 1, Standard/Deluxe), 201-208 (Floor 2, Deluxe/Suite)
+  // 2) Rooms — updated per client's room type map:
+  // 101, 102, 206 → Twin Bedroom
+  // 103, 104, 105, 107, 208 → Deluxe Bedroom
+  // 106 → Family Room
+  // 201, 202, 203, 204, 207 → Superior
+  // 205 → GVD Suite
   const roomSpecs: { number: string; floor: number; type: string; rate: number; bed: string }[] = [
-    // Floor 1 — Standard & Deluxe (closer to lobby/dining)
-    { number: '101', floor: 1, type: 'Standard', rate: 1200, bed: 'Double' },
-    { number: '102', floor: 1, type: 'Standard', rate: 1200, bed: 'Double' },
-    { number: '103', floor: 1, type: 'Standard', rate: 1200, bed: 'Twin' },
-    { number: '104', floor: 1, type: 'Deluxe',   rate: 1500, bed: 'Double' },
-    { number: '105', floor: 1, type: 'Deluxe',   rate: 1500, bed: 'Double' },
-    { number: '106', floor: 1, type: 'Deluxe',   rate: 1500, bed: 'Twin' },
-    { number: '107', floor: 1, type: 'Deluxe',   rate: 1500, bed: 'Double' },
-    // Floor 2 — Deluxe & Suite
-    { number: '201', floor: 2, type: 'Deluxe',   rate: 1700, bed: 'Double' },
-    { number: '202', floor: 2, type: 'Deluxe',   rate: 1700, bed: 'Double' },
-    { number: '203', floor: 2, type: 'Deluxe',   rate: 1700, bed: 'Twin' },
-    { number: '204', floor: 2, type: 'Deluxe',   rate: 1700, bed: 'Double' },
-    { number: '205', floor: 2, type: 'Suite',    rate: 2500, bed: 'King' },
-    { number: '206', floor: 2, type: 'Suite',    rate: 2500, bed: 'King' },
-    { number: '207', floor: 2, type: 'Suite',    rate: 2800, bed: 'King' },
-    { number: '208', floor: 2, type: 'Suite',    rate: 2800, bed: 'King' },
+    // Floor 1
+    { number: '101', floor: 1, type: 'Twin Bedroom',     rate: 1200, bed: 'Twin' },
+    { number: '102', floor: 1, type: 'Twin Bedroom',     rate: 1200, bed: 'Twin' },
+    { number: '103', floor: 1, type: 'Deluxe Bedroom',   rate: 1500, bed: 'Double' },
+    { number: '104', floor: 1, type: 'Deluxe Bedroom',   rate: 1500, bed: 'Double' },
+    { number: '105', floor: 1, type: 'Deluxe Bedroom',   rate: 1500, bed: 'Double' },
+    { number: '106', floor: 1, type: 'Family Room',      rate: 2000, bed: 'Double' },
+    { number: '107', floor: 1, type: 'Deluxe Bedroom',   rate: 1500, bed: 'Double' },
+    // Floor 2
+    { number: '201', floor: 2, type: 'Superior',         rate: 1800, bed: 'Double' },
+    { number: '202', floor: 2, type: 'Superior',         rate: 1800, bed: 'Double' },
+    { number: '203', floor: 2, type: 'Superior',         rate: 1800, bed: 'Double' },
+    { number: '204', floor: 2, type: 'Superior',         rate: 1800, bed: 'Double' },
+    { number: '205', floor: 2, type: 'GVD Suite',        rate: 3500, bed: 'King' },
+    { number: '206', floor: 2, type: 'Twin Bedroom',     rate: 1700, bed: 'Twin' },
+    { number: '207', floor: 2, type: 'Superior',         rate: 2000, bed: 'Double' },
+    { number: '208', floor: 2, type: 'Deluxe Bedroom',   rate: 1700, bed: 'Double' },
   ]
 
   for (const r of roomSpecs) {
+    // Update existing room types/rates, or create if new
     await db.room.upsert({
       where: { number: r.number },
-      update: {},
+      update: {
+        type: r.type,
+        ratePerNight: r.rate,
+        bedType: r.bed,
+        capacity: r.bed === 'Twin' ? 3 : r.bed === 'King' ? 4 : 2,
+      },
       create: {
         number: r.number,
         floor: r.floor,

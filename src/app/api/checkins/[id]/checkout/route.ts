@@ -14,6 +14,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const discount = Number(body.discount) || 0
   const extraCharges = Number(body.extraCharges) || 0
   const notes = body.notes || null
+  // Allow custom GST rates — defaults to config values
+  const customCgstRate = body.cgstRate != null ? Math.max(0, Math.min(100, Number(body.cgstRate))) : null
+  const customSgstRate = body.sgstRate != null ? Math.max(0, Math.min(100, Number(body.sgstRate))) : null
 
   const checkIn = await db.checkIn.findUnique({
     where: { id },
@@ -44,8 +47,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // fetch tax rates from hotel config
   const config = await db.hotelConfig.findUnique({ where: { id: 'main' } })
-  const cgstRate = config?.cgstRate ?? 9
-  const sgstRate = config?.sgstRate ?? 9
+  // Use custom rates if provided, else fall back to config
+  const cgstRate = customCgstRate != null ? customCgstRate : (config?.cgstRate ?? 9)
+  const sgstRate = customSgstRate != null ? customSgstRate : (config?.sgstRate ?? 9)
   const cgstAmount = Math.round(taxableAmount * cgstRate) / 100
   const sgstAmount = Math.round(taxableAmount * sgstRate) / 100
   const grandTotal = taxableAmount + cgstAmount + sgstAmount

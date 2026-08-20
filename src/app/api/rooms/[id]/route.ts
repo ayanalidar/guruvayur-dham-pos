@@ -20,8 +20,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data.floor = f
   }
   if (body.type != null) {
-    const validTypes = ['Standard', 'Deluxe', 'Suite']
-    data.type = validTypes.includes(body.type) ? body.type : 'Standard'
+    const validTypes = ['Twin Bedroom', 'Deluxe Bedroom', 'Family Room', 'Superior', 'GVD Suite', 'Standard', 'Deluxe', 'Suite']
+    data.type = validTypes.includes(body.type) ? body.type : 'Deluxe Bedroom'
   }
   if (body.ratePerNight != null) {
     const r = Number(body.ratePerNight)

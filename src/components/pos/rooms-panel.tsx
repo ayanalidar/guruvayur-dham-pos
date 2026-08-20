@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw, Pencil, Utensils, CalendarClock, QrCode as QrIcon, Printer } from 'lucide-react'
+import { Bed, BedDouble, Users, Sparkles, Wrench, CheckCircle2, LogIn, LogOut, RefreshCw, Pencil, Utensils, CalendarClock, QrCode as QrIcon, Printer, UserPlus } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, apiFetch } from '@/lib/format'
 import { QrCode } from './qr-code'
 
@@ -34,6 +35,7 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
   const [editOpen, setEditOpen] = useState(false)
   const [extendStayOpen, setExtendStayOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
+  const [walkInOpen, setWalkInOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -119,7 +121,12 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
             {rooms.length} rooms · {rooms.filter(r => r.status === 'available').length} available · {rooms.filter(r => r.status === 'occupied').length} occupied
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setWalkInOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" /> Walk-in Check-in
+          </Button>
+          <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
+        </div>
       </div>
 
       <FloorBlock title="First Floor" subtitle="Standard & Deluxe" rooms={floor1}
@@ -168,6 +175,12 @@ export function RoomsPanel({ onOrderFoodForCheckIn }: { onOrderFoodForCheckIn?: 
         open={qrOpen}
         onOpenChange={setQrOpen}
         room={selectedRoom}
+      />
+      <WalkInDrawer
+        open={walkInOpen}
+        onOpenChange={setWalkInOpen}
+        rooms={rooms}
+        onDone={() => { setWalkInOpen(false); load() }}
       />
     </div>
   )
@@ -545,16 +558,25 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
   const [paymentMethod, setPaymentMethod] = useState('Cash')
   const [summary, setSummary] = useState<any>(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
+  // Editable GST rates — default 9% each (configurable in Settings)
+  const [cgstRate, setCgstRate] = useState(9)
+  const [sgstRate, setSgstRate] = useState(9)
 
   useEffect(() => {
     if (open && room) {
       setDiscount(0); setExtraCharges(0); setPaymentMethod('Cash'); setSummary(null)
-      // fetch summary
+      setCgstRate(9); setSgstRate(9) // Reset to default on open
+      // fetch summary + current tax rates from config
       setLoadingSummary(true)
-      apiFetch<{ checkIns: any[] }>(`/api/checkins?status=active`).then(d => {
+      Promise.all([
+        apiFetch<{ checkIns: any[] }>(`/api/checkins?status=active`),
+        apiFetch<{ config: any }>(`/api/config`),
+      ]).then(([d, cfg]) => {
+        // Set tax rates from hotel config
+        if (cfg.config?.cgstRate) setCgstRate(cfg.config.cgstRate)
+        if (cfg.config?.sgstRate) setSgstRate(cfg.config.sgstRate)
         const ci = d.checkIns.find(c => c.roomId === room.id)
         if (ci) {
-          // simple summary calculation
           const nights = Math.max(1, Math.ceil((Date.now() - new Date(ci.checkInAt).getTime()) / 86400000))
           const roomCharges = nights * room.ratePerNight
           const foodCharges = (ci.foodOrders || []).reduce((s: number, o: any) => s + o.grandTotal, 0)
@@ -578,6 +600,8 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
             paymentMethod,
             discount: Number(discount) || 0,
             extraCharges: Number(extraCharges) || 0,
+            cgstRate: Number(cgstRate) || 0,
+            sgstRate: Number(sgstRate) || 0,
           }),
         }
       )
@@ -609,8 +633,8 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
   }
 
   const taxableAmount = Math.max(0, summary.total + Number(extraCharges) - Number(discount))
-  const cgst = Math.round(taxableAmount * 9) / 100
-  const sgst = Math.round(taxableAmount * 9) / 100
+  const cgst = Math.round(taxableAmount * (Number(cgstRate) || 0)) / 100
+  const sgst = Math.round(taxableAmount * (Number(sgstRate) || 0)) / 100
   const grandTotal = taxableAmount + cgst + sgst
   const balance = Math.max(0, grandTotal - summary.advance)
 
@@ -668,16 +692,44 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
             </Select>
           </Field>
 
-          {/* Final total */}
+          {/* Final total with editable GST */}
           <div className="rounded-lg border bg-primary/5 p-4 space-y-1.5 text-sm">
             <div className="flex justify-between">
               <span>Taxable Amount</span><span className="font-mono">{formatINR(taxableAmount)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>CGST (9%)</span><span className="font-mono">{formatINR(cgst)}</span>
+            {/* CGST — editable rate */}
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                CGST
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={cgstRate}
+                  onChange={e => setCgstRate(Number(e.target.value) || 0)}
+                  className="h-5 w-14 text-xs font-mono px-1"
+                />
+                %
+              </span>
+              <span className="font-mono">{formatINR(cgst)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>SGST (9%)</span><span className="font-mono">{formatINR(sgst)}</span>
+            {/* SGST — editable rate */}
+            <div className="flex justify-between items-center text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                SGST
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={sgstRate}
+                  onChange={e => setSgstRate(Number(e.target.value) || 0)}
+                  className="h-5 w-14 text-xs font-mono px-1"
+                />
+                %
+              </span>
+              <span className="font-mono">{formatINR(sgst)}</span>
             </div>
             <div className="flex justify-between border-t pt-1.5 font-semibold">
               <span>Grand Total</span><span className="font-mono">{formatINR(grandTotal)}</span>
@@ -796,9 +848,14 @@ function EditRoomDialog({ open, onOpenChange, room, onDone }: {
               <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Standard">Standard</SelectItem>
-                  <SelectItem value="Deluxe">Deluxe</SelectItem>
-                  <SelectItem value="Suite">Suite</SelectItem>
+                  <SelectItem value="Twin Bedroom">Twin Bedroom</SelectItem>
+                  <SelectItem value="Deluxe Bedroom">Deluxe Bedroom</SelectItem>
+                  <SelectItem value="Family Room">Family Room</SelectItem>
+                  <SelectItem value="Superior">Superior</SelectItem>
+                  <SelectItem value="GVD Suite">GVD Suite</SelectItem>
+                  <SelectItem value="Standard">Standard (legacy)</SelectItem>
+                  <SelectItem value="Deluxe">Deluxe (legacy)</SelectItem>
+                  <SelectItem value="Suite">Suite (legacy)</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -1008,5 +1065,231 @@ function RoomQRDialog({ open, onOpenChange, room }: {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ====== Walk-in Drawer — quick check-in for walk-in customers ======
+function WalkInDrawer({ open, onOpenChange, rooms, onDone }: {
+  open: boolean; onOpenChange: (v: boolean) => void; rooms: Room[]; onDone: () => void
+}) {
+  const { toast } = useToast()
+  const [submitting, setSubmitting] = useState(false)
+  const availableRooms = rooms.filter(r => r.status === 'available')
+  const [returningGuest, setReturningGuest] = useState<any>(null)
+  const [checkingGuest, setCheckingGuest] = useState(false)
+  const [form, setForm] = useState({
+    guestName: '', phone: '', email: '', address: '',
+    idProofType: 'Aadhaar', idNumber: '',
+    adults: 2, children: 0, advanceAmount: 0,
+    expectedCheckOut: '', notes: '', roomId: '',
+  })
+
+  useEffect(() => {
+    if (open) {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(11, 0, 0, 0)
+      setForm({
+        guestName: '', phone: '', email: '', address: '',
+        idProofType: 'Aadhaar', idNumber: '',
+        adults: 2, children: 0, advanceAmount: 0,
+        expectedCheckOut: tomorrow.toISOString().slice(0, 16),
+        notes: '', roomId: '',
+      })
+      setReturningGuest(null)
+    }
+  }, [open])
+
+  // Debounced phone lookup for returning guest detection
+  useEffect(() => {
+    if (!form.phone || form.phone.replace(/\D/g, '').length < 4) {
+      setReturningGuest(null)
+      return
+    }
+    setCheckingGuest(true)
+    const t = setTimeout(async () => {
+      try {
+        const d = await apiFetch<{ found: boolean; guest?: any }>(`/api/guests/lookup?phone=${encodeURIComponent(form.phone)}`)
+        setReturningGuest(d as any)
+        if (d.found && d.guest) {
+          setForm(prev => ({
+            ...prev,
+            guestName: prev.guestName || d.guest.name,
+            email: prev.email || d.guest.email || '',
+            address: prev.address || d.guest.address || '',
+            idProofType: prev.idProofType !== 'Aadhaar' ? prev.idProofType : (d.guest.idProofType || 'Aadhaar'),
+            idNumber: prev.idNumber || d.guest.idNumber || '',
+          }))
+        }
+      } catch { setReturningGuest(null) }
+      finally { setCheckingGuest(false) }
+    }, 500)
+    return () => clearTimeout(t)
+  }, [form.phone])
+
+  async function submit() {
+    if (!form.guestName.trim() || !form.phone.trim() || !form.roomId) {
+      toast({ title: 'Guest name, phone, and room are required', variant: 'destructive' })
+      return
+    }
+    setSubmitting(true)
+    try {
+      await apiFetch('/api/checkins', {
+        method: 'POST',
+        body: JSON.stringify({
+          roomId: form.roomId,
+          guestName: form.guestName.trim(),
+          phone: form.phone.trim(),
+          email: form.email || undefined,
+          address: form.address || undefined,
+          idProofType: form.idProofType,
+          idNumber: form.idNumber || undefined,
+          adults: Number(form.adults) || 1,
+          children: Number(form.children) || 0,
+          advanceAmount: Number(form.advanceAmount) || 0,
+          expectedCheckOut: form.expectedCheckOut ? new Date(form.expectedCheckOut).toISOString() : undefined,
+          notes: form.notes || undefined,
+        }),
+      })
+      const room = availableRooms.find(rm => rm.id === form.roomId)
+      toast({
+        title: `Checked in to Room ${room?.number}`,
+        description: `Guest: ${form.guestName}`,
+      })
+      onDone()
+    } catch (e: any) {
+      toast({ title: 'Check-in failed', description: e.message, variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[92vh]">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle className="flex items-center gap-2">
+            <UserPlus className="h-5 w-5" /> Walk-in Check-in
+          </DrawerTitle>
+          <DrawerDescription>
+            Quick check-in for walk-in customers. {availableRooms.length} rooms available.
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <div className="overflow-y-auto px-4 pb-4 max-w-2xl mx-auto w-full">
+          {/* Room selection first */}
+          <div className="space-y-2 mb-4">
+            <Label className="text-xs font-semibold">Select Available Room *</Label>
+            {availableRooms.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-3 rounded border bg-muted/30">
+                No rooms available. All rooms are occupied or under maintenance.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {availableRooms.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => setForm({ ...form, roomId: r.id })}
+                    className={`p-2 rounded-lg border text-center transition ${form.roomId === r.id ? 'border-primary bg-primary/10 ring-2 ring-primary' : 'border-gray-200 hover:border-gray-400'}`}
+                  >
+                    <p className="font-bold text-lg">{r.number}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.type}</p>
+                    <p className="text-[10px] font-medium">{formatINR(r.ratePerNight)}/night</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Guest details */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Guest Name *">
+                <Input value={form.guestName} onChange={e => setForm({ ...form, guestName: e.target.value })} placeholder="Full name" />
+              </Field>
+              <Field label="Phone *">
+                <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+91 ..." />
+              </Field>
+            </div>
+
+            {/* Returning guest indicator */}
+            {checkingGuest && <p className="text-xs text-muted-foreground animate-pulse">Checking guest records...</p>}
+            {returningGuest?.found && returningGuest.guest && (
+              <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs">
+                <p className="font-semibold text-emerald-800">↻ Returning Guest · {returningGuest.guest.totalStays} previous stay(s)</p>
+                <p className="text-emerald-700 mt-0.5">
+                  Last visited: {formatDateShort(returningGuest.guest.lastVisit)}
+                  {returningGuest.guest.lastRoom && ` · Last room: ${returningGuest.guest.lastRoom}`}
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email (optional)">
+                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              </Field>
+              <Field label="Address (optional)">
+                <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="ID Proof Type">
+                <Select value={form.idProofType} onValueChange={v => setForm({ ...form, idProofType: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aadhaar">Aadhaar</SelectItem>
+                    <SelectItem value="Passport">Passport</SelectItem>
+                    <SelectItem value="Driving License">Driving License</SelectItem>
+                    <SelectItem value="Voter ID">Voter ID</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="ID Number">
+                <Input value={form.idNumber} onChange={e => setForm({ ...form, idNumber: e.target.value })} />
+              </Field>
+              <Field label="Expected Check-out">
+                <Input type="datetime-local" value={form.expectedCheckOut} onChange={e => setForm({ ...form, expectedCheckOut: e.target.value })} />
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Adults">
+                <Input type="number" min={1} value={form.adults} onChange={e => setForm({ ...form, adults: Number(e.target.value) })} />
+              </Field>
+              <Field label="Children">
+                <Input type="number" min={0} value={form.children} onChange={e => setForm({ ...form, children: Number(e.target.value) })} />
+              </Field>
+              <Field label="Advance Paid (₹)">
+                <Input type="number" min={0} value={form.advanceAmount} onChange={e => setForm({ ...form, advanceAmount: Number(e.target.value) })} />
+              </Field>
+            </div>
+
+            <Field label="Notes">
+              <Textarea rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Special requests, etc." />
+            </Field>
+          </div>
+
+          {/* Summary + submit */}
+          {form.roomId && (
+            <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">
+                Room {availableRooms.find(r => r.id === form.roomId)?.number} · {availableRooms.find(r => r.id === form.roomId)?.type}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Rate: {formatINR(availableRooms.find(r => r.id === form.roomId)?.ratePerNight || 0)}/night
+                {form.advanceAmount > 0 && ` · Advance: ${formatINR(form.advanceAmount)}`}
+              </p>
+            </div>
+          )}
+
+          <Button
+            className="w-full mt-4"
+            onClick={submit}
+            disabled={submitting || !form.roomId || !form.guestName || !form.phone}
+          >
+            {submitting ? 'Checking in...' : 'Confirm Check-in'}
+          </Button>
+        </div>
+      </DrawerContent>
+    </Drawer>
   )
 }
