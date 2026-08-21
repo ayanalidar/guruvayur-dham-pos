@@ -1,4 +1,5 @@
 'use client'
+import { printInvoice } from '@/lib/print'
 
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -394,7 +395,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -549,15 +550,15 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
             <InvoiceTotals
               rows={editMode ? [
                 { label: 'Taxable Amount', value: Number(form.taxableAmount) || 0 },
-                { label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) || 0 },
-                { label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) || 0 },
+                ...(Number(form.cgstAmount) > 0 ? [{ label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) }] : []),
+                ...(Number(form.sgstAmount) > 0 ? [{ label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) }] : []),
                 { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
                 { label: 'Advance Paid', value: -(Number(form.advancePaid) || 0), muted: true, emerald: true },
                 { label: 'Balance Due', value: Number(form.balanceDue) || 0, bold: true, primary: true },
               ] : [
                 { label: 'Taxable Amount', value: invoice.taxableAmount },
-                { label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount },
-                { label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount },
+                ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
+                ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
                 { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
                 { label: 'Advance Paid', value: -invoice.advancePaid, muted: true, emerald: true },
                 { label: 'Balance Due', value: invoice.balanceDue, bold: true, primary: true },
@@ -575,7 +576,38 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           <InvoiceFooter config={config} />
         </div>
 
-        <DialogFooter className="no-print">
+        <DialogFooter className="no-print flex-wrap gap-2">
+          {/* Settle Payment — marks balance as 0 */}
+          {invoice.balanceDue > 0 && !editMode && (
+            <Button
+              variant="default"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              onClick={async () => {
+                if (!confirm(`Settle balance of ${formatINR(invoice.balanceDue)}? This will mark the invoice as fully paid.`)) return
+                try {
+                  await apiFetch(`/api/invoices/hotel/${invoice.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                      advancePaid: invoice.grandTotal,
+                      balanceDue: 0,
+                    }),
+                  })
+                  toast({ title: 'Payment settled', description: `Balance of ${formatINR(invoice.balanceDue)} cleared.` })
+                  Object.assign(invoice, { advancePaid: invoice.grandTotal, balanceDue: 0 })
+                  window.dispatchEvent(new CustomEvent('invoice-updated'))
+                } catch (e: any) {
+                  toast({ title: 'Settle failed', description: e.message, variant: 'destructive' })
+                }
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" /> Settle ₹{invoice.balanceDue.toFixed(2)}
+            </Button>
+          )}
+          {invoice.balanceDue <= 0 && (
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Fully Paid
+            </Badge>
+          )}
           <Button variant="destructive" onClick={async () => {
             if (!confirm('Delete this hotel invoice permanently? This cannot be undone.')) return
             try {
@@ -590,7 +622,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -699,7 +731,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
@@ -816,8 +848,8 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
                 { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
               ] : [
                 { label: 'Taxable Amount', value: invoice.itemsTotal },
-                { label: `CGST (${invoice.cgstRate.toFixed(1)}%)`, value: invoice.cgstAmount },
-                { label: `SGST (${invoice.sgstRate.toFixed(1)}%)`, value: invoice.sgstAmount },
+                ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate.toFixed(1)}%)`, value: invoice.cgstAmount }] : []),
+                ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate.toFixed(1)}%)`, value: invoice.sgstAmount }] : []),
                 { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
               ]}
             />
@@ -851,7 +883,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1311,7 +1343,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" /> New Custom Invoice
@@ -1445,7 +1477,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[95vw]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" /> Custom Invoice #{invoice.invoiceNumber}
@@ -1503,8 +1535,9 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
           <div className="mt-3 flex justify-end">
             <InvoiceTotals rows={[
               { label: 'Taxable Amount', value: invoice.itemsTotal - invoice.discount },
-              { label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount },
-              { label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount },
+              ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
+              ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
+              ...(invoice.igstAmount > 0 ? [{ label: `IGST (${invoice.igstRate}%)`, value: invoice.igstAmount }] : []),
               { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
             ]} />
           </div>
@@ -1530,7 +1563,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
