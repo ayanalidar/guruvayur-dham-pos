@@ -645,8 +645,8 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <LogOut className="h-5 w-5" /> Check Out — Room {room.number}
           </DialogTitle>
@@ -655,7 +655,7 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 overflow-y-auto py-2 space-y-4">
           {/* Summary */}
           <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
             <div className="flex justify-between">
@@ -775,7 +775,7 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
           </p>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting}>
             {submitting ? 'Checking out...' : 'Confirm Check-Out & Generate Invoice'}

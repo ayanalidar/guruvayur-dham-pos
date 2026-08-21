@@ -12,8 +12,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw, Trash2 } from 'lucide-react'
+import { Receipt, Utensils, Printer, RefreshCw, FileText, Plus, Pencil, Shield, CheckCircle2, X, Save, RotateCcw, Trash2, Download } from 'lucide-react'
 import { formatINR, formatDateShort, formatDate, formatTime, apiFetch } from '@/lib/format'
+import { downloadHotelInvoices, downloadFoodInvoices, downloadCustomInvoices } from '@/lib/download'
 import { QrCode } from './qr-code'
 
 type HotelInvoice = {
@@ -124,7 +125,7 @@ function HotelInvoicesTab() {
     <>
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{invoices.length} invoices</p>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
+        <div className="flex gap-2"><Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button><Button variant="outline" size="sm" onClick={() => downloadHotelInvoices()}><Download className="h-4 w-4 mr-2" />CSV</Button></div>
       </div>
 
       {loading ? (
@@ -219,7 +220,7 @@ function FoodInvoicesTab() {
     <>
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{invoices.length} invoices</p>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button>
+        <div className="flex gap-2"><Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" />Refresh</Button><Button variant="outline" size="sm" onClick={() => downloadFoodInvoices()}><Download className="h-4 w-4 mr-2" />CSV</Button></div>
       </div>
 
       {loading ? (
@@ -395,8 +396,8 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
               <Receipt className="h-5 w-5" /> Hotel Invoice
@@ -419,7 +420,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           </DialogTitle>
         </DialogHeader>
 
-        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
+        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
@@ -575,8 +576,9 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
           <InvoiceFooter config={config} />
         </div>
+        </div>
 
-        <DialogFooter className="no-print flex-wrap gap-2">
+        <DialogFooter className="no-print shrink-0 flex-wrap gap-2">
           {/* Settle Payment — marks balance as 0 */}
           {invoice.balanceDue > 0 && !editMode && (
             <Button
@@ -731,8 +733,8 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 justify-between">
             <span className="flex items-center gap-2">
               <Utensils className="h-5 w-5" /> Food Invoice
@@ -754,7 +756,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
+        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
@@ -867,8 +869,9 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
           <InvoiceFooter config={config} />
         </div>
+        </div>
 
-        <DialogFooter className="no-print">
+        <DialogFooter className="no-print shrink-0">
           <Button variant="destructive" onClick={async () => {
             if (!confirm('Delete this food invoice permanently? This cannot be undone.')) return
             try {
@@ -1236,9 +1239,12 @@ function CustomInvoicesTab() {
     <>
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-muted-foreground">{invoices.length} custom invoice{invoices.length !== 1 ? 's' : ''}</p>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => downloadCustomInvoices()}><Download className="h-4 w-4 mr-2" />CSV</Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
           <Plus className="h-4 w-4 mr-1.5" /> New Custom Invoice
         </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -1344,7 +1350,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" /> New Custom Invoice
           </DialogTitle>
@@ -1477,14 +1483,14 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" /> Custom Invoice #{invoice.invoiceNumber}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="invoice-print bg-white p-4" style={{ overflowWrap: 'break-word', wordWrap: 'break-word', maxWidth: '100%' }}>
+        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="CUSTOM INVOICE" copyNote="Original" />
 
           {/* Customer details */}
@@ -1549,8 +1555,9 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
           <InvoiceFooter config={config} />
         </div>
+        </div>
 
-        <DialogFooter className="no-print">
+        <DialogFooter className="no-print shrink-0">
           <Button variant="destructive" onClick={async () => {
             if (!confirm('Delete this custom invoice permanently?')) return
             try {

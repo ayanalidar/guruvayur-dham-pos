@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useToast } from '@/hooks/use-toast'
-import { Clock, ChefHat, CheckCircle2, Utensils, X, RefreshCw, Receipt, Leaf, Drumstick } from 'lucide-react'
+import { Clock, ChefHat, CheckCircle2, Utensils, X, RefreshCw, Receipt, Leaf, Drumstick, Download } from 'lucide-react'
 import { formatINR, formatDate, apiFetch } from '@/lib/format'
+import { downloadOrders } from '@/lib/download'
 
 type FoodOrder = {
   id: string; orderNumber: string; customerName: string; roomNumber: string | null; tableNumber: string | null
@@ -166,7 +167,7 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
             {orders.filter(o => ['pending', 'preparing'].includes(o.status)).length} active · {orders.filter(o => o.status === 'served').length} served today
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
+        <div className="flex gap-2"><Button variant="outline" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button><Button variant="outline" size="sm" onClick={() => downloadOrders()}><Download className="h-4 w-4 mr-2" /> CSV</Button></div>
       </div>
 
       <Tabs value={filter} onValueChange={setFilter}>
