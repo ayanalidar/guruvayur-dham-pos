@@ -194,12 +194,17 @@ model CustomInvoice {
   customerName    String
   customerPhone   String?
   customerAddress String?
+  customerGstIn   String?
+  checkInDate     DateTime?
+  checkOutDate    DateTime?
   items           Json     // [{ name, quantity, rate, amount }]
   itemsTotal      Float
   cgstRate        Float    @default(0)
   sgstRate        Float    @default(0)
+  igstRate        Float    @default(0)
   cgstAmount      Float    @default(0)
   sgstAmount      Float    @default(0)
+  igstAmount      Float    @default(0)
   grandTotal      Float
   discount        Float    @default(0)
   paymentMethod   String?

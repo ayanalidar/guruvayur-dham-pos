@@ -561,11 +561,12 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
   // Editable GST rates — default 9% each (configurable in Settings)
   const [cgstRate, setCgstRate] = useState(9)
   const [sgstRate, setSgstRate] = useState(9)
+  const [igstRate, setIgstRate] = useState(0) // 0 = use CGST+SGST, >0 = inter-state
 
   useEffect(() => {
     if (open && room) {
       setDiscount(0); setExtraCharges(0); setPaymentMethod('Cash'); setSummary(null)
-      setCgstRate(9); setSgstRate(9) // Reset to default on open
+      setCgstRate(9); setSgstRate(9); setIgstRate(0) // Reset to default on open
       // fetch summary + current tax rates from config
       setLoadingSummary(true)
       Promise.all([
@@ -602,6 +603,7 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
             extraCharges: Number(extraCharges) || 0,
             cgstRate: Number(cgstRate) || 0,
             sgstRate: Number(sgstRate) || 0,
+            igstRate: Number(igstRate) || 0,
           }),
         }
       )
@@ -633,9 +635,12 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
   }
 
   const taxableAmount = Math.max(0, summary.total + Number(extraCharges) - Number(discount))
-  const cgst = Math.round(taxableAmount * (Number(cgstRate) || 0)) / 100
-  const sgst = Math.round(taxableAmount * (Number(sgstRate) || 0)) / 100
-  const grandTotal = taxableAmount + cgst + sgst
+  // If IGST > 0, use IGST only (inter-state). Otherwise CGST+SGST (intra-state).
+  const useIgst = Number(igstRate) > 0
+  const cgst = useIgst ? 0 : Math.round(taxableAmount * (Number(cgstRate) || 0)) / 100
+  const sgst = useIgst ? 0 : Math.round(taxableAmount * (Number(sgstRate) || 0)) / 100
+  const igst = useIgst ? Math.round(taxableAmount * (Number(igstRate) || 0)) / 100 : 0
+  const grandTotal = taxableAmount + cgst + sgst + igst
   const balance = Math.max(0, grandTotal - summary.advance)
 
   return (
@@ -697,40 +702,63 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
             <div className="flex justify-between">
               <span>Taxable Amount</span><span className="font-mono">{formatINR(taxableAmount)}</span>
             </div>
-            {/* CGST — editable rate */}
+            {/* IGST (inter-state) — if >0, CGST/SGST are zeroed */}
             <div className="flex justify-between items-center text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                CGST
+                IGST
                 <Input
                   type="number"
                   step="0.1"
                   min="0"
                   max="100"
-                  value={cgstRate}
-                  onChange={e => setCgstRate(Number(e.target.value) || 0)}
+                  value={igstRate}
+                  onChange={e => setIgstRate(Number(e.target.value) || 0)}
                   className="h-5 w-14 text-xs font-mono px-1"
+                  placeholder="0"
                 />
                 %
+                <span className="text-[10px]">(inter-state)</span>
               </span>
-              <span className="font-mono">{formatINR(cgst)}</span>
+              <span className="font-mono">{formatINR(igst)}</span>
             </div>
-            {/* SGST — editable rate */}
-            <div className="flex justify-between items-center text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                SGST
-                <Input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={sgstRate}
-                  onChange={e => setSgstRate(Number(e.target.value) || 0)}
-                  className="h-5 w-14 text-xs font-mono px-1"
-                />
-                %
-              </span>
-              <span className="font-mono">{formatINR(sgst)}</span>
-            </div>
+            {/* CGST — editable rate (only if IGST is 0) */}
+            {!useIgst && (
+              <div className="flex justify-between items-center text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  CGST
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={cgstRate}
+                    onChange={e => setCgstRate(Number(e.target.value) || 0)}
+                    className="h-5 w-14 text-xs font-mono px-1"
+                  />
+                  %
+                </span>
+                <span className="font-mono">{formatINR(cgst)}</span>
+              </div>
+            )}
+            {/* SGST — editable rate (only if IGST is 0) */}
+            {!useIgst && (
+              <div className="flex justify-between items-center text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  SGST
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={sgstRate}
+                    onChange={e => setSgstRate(Number(e.target.value) || 0)}
+                    className="h-5 w-14 text-xs font-mono px-1"
+                  />
+                  %
+                </span>
+                <span className="font-mono">{formatINR(sgst)}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t pt-1.5 font-semibold">
               <span>Grand Total</span><span className="font-mono">{formatINR(grandTotal)}</span>
             </div>

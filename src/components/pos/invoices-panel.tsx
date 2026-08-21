@@ -1253,7 +1253,8 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
   const [config, setConfig] = useState<any>(null)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
-    customerName: '', customerPhone: '', customerAddress: '',
+    customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '',
+    customInvoiceNumber: '', checkInDate: '', checkOutDate: '',
     cgstRate: 0, sgstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '',
   })
   const [items, setItems] = useState<{ name: string; quantity: number; rate: number }[]>([
@@ -1266,16 +1267,18 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         setConfig(d.config)
         setForm(f => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9 }))
       }).catch(() => {})
-      setForm({ customerName: '', customerPhone: '', customerAddress: '', cgstRate: 9, sgstRate: 9, discount: 0, paymentMethod: 'Cash', notes: '' })
+      setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
       setItems([{ name: '', quantity: 1, rate: 0 }])
     }
   }, [open])
 
   const itemsTotal = items.reduce((s, it) => s + (it.rate * it.quantity), 0)
   const taxable = Math.max(0, itemsTotal - (Number(form.discount) || 0))
-  const cgst = Math.round(taxable * (Number(form.cgstRate) || 0)) / 100
-  const sgst = Math.round(taxable * (Number(form.sgstRate) || 0)) / 100
-  const grandTotal = taxable + cgst + sgst
+  const useIgst = Number((form as any).igstRate) > 0
+  const cgst = useIgst ? 0 : Math.round(taxable * (Number(form.cgstRate) || 0)) / 100
+  const sgst = useIgst ? 0 : Math.round(taxable * (Number(form.sgstRate) || 0)) / 100
+  const igst = useIgst ? Math.round(taxable * Number((form as any).igstRate || 0)) / 100 : 0
+  const grandTotal = taxable + cgst + sgst + igst
 
   function updateItem(idx: number, field: string, value: any) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: field === 'name' ? value : Number(value) || 0 } : it))
@@ -1316,18 +1319,34 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Customer details */}
+          {/* Invoice number + Customer details */}
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Invoice Number (leave blank for auto)">
+              <Input value={(form as any).customInvoiceNumber || ''} onChange={e => setForm({ ...form, customInvoiceNumber: e.target.value } as any)} placeholder="Auto: 1, 2, 3..." />
+            </Field>
             <Field label="Customer Name *">
               <Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} placeholder="Name / Company" />
             </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Phone (optional)">
               <Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} placeholder="+91 ..." />
+            </Field>
+            <Field label="GSTIN (B2B billing)">
+              <Input value={(form as any).customerGstIn || ''} onChange={e => setForm({ ...form, customerGstIn: e.target.value } as any)} placeholder="22AAAAA0000A1Z5" />
             </Field>
           </div>
           <Field label="Address (optional)">
             <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Check-in Date (optional)">
+              <Input type="date" value={(form as any).checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value } as any)} />
+            </Field>
+            <Field label="Check-out Date (optional)">
+              <Input type="date" value={(form as any).checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value } as any)} />
+            </Field>
+          </div>
 
           {/* Items builder */}
           <div>
@@ -1352,16 +1371,23 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
           </div>
 
           {/* Tax + discount */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <Field label="Discount (₹)">
               <Input type="number" min={0} value={form.discount} onChange={e => setForm({ ...form, discount: Number(e.target.value) })} className="h-8 text-xs" />
             </Field>
-            <Field label="CGST %">
-              <Input type="number" step="0.1" min={0} value={form.cgstRate} onChange={e => setForm({ ...form, cgstRate: Number(e.target.value) })} className="h-8 text-xs" />
+            <Field label="IGST % (inter-state)">
+              <Input type="number" step="0.1" min={0} value={(form as any).igstRate || 0} onChange={e => setForm({ ...form, igstRate: Number(e.target.value) } as any)} className="h-8 text-xs" placeholder="0" />
             </Field>
-            <Field label="SGST %">
-              <Input type="number" step="0.1" min={0} value={form.sgstRate} onChange={e => setForm({ ...form, sgstRate: Number(e.target.value) })} className="h-8 text-xs" />
-            </Field>
+            {!useIgst && (
+              <Field label="CGST %">
+                <Input type="number" step="0.1" min={0} value={form.cgstRate} onChange={e => setForm({ ...form, cgstRate: Number(e.target.value) })} className="h-8 text-xs" />
+              </Field>
+            )}
+            {!useIgst && (
+              <Field label="SGST %">
+                <Input type="number" step="0.1" min={0} value={form.sgstRate} onChange={e => setForm({ ...form, sgstRate: Number(e.target.value) })} className="h-8 text-xs" />
+              </Field>
+            )}
             <Field label="Payment">
               <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-8 text-xs w-full border rounded px-1">
                 <option value="Cash">Cash</option>
@@ -1381,8 +1407,14 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
             <div className="flex justify-between"><span className="text-muted-foreground">Items Total</span><span className="font-mono">{formatINR(itemsTotal)}</span></div>
             {form.discount > 0 && <div className="flex justify-between text-emerald-700"><span>Discount</span><span className="font-mono">- {formatINR(form.discount)}</span></div>}
             <div className="flex justify-between"><span className="text-muted-foreground">Taxable</span><span className="font-mono">{formatINR(taxable)}</span></div>
-            <div className="flex justify-between text-xs"><span className="text-muted-foreground">CGST ({form.cgstRate}%)</span><span className="font-mono">{formatINR(cgst)}</span></div>
-            <div className="flex justify-between text-xs"><span className="text-muted-foreground">SGST ({form.sgstRate}%)</span><span className="font-mono">{formatINR(sgst)}</span></div>
+            {useIgst ? (
+              <div className="flex justify-between text-xs"><span className="text-muted-foreground">IGST ({(form as any).igstRate}%)</span><span className="font-mono">{formatINR(igst)}</span></div>
+            ) : (
+              <>
+                <div className="flex justify-between text-xs"><span className="text-muted-foreground">CGST ({form.cgstRate}%)</span><span className="font-mono">{formatINR(cgst)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-muted-foreground">SGST ({form.sgstRate}%)</span><span className="font-mono">{formatINR(sgst)}</span></div>
+              </>
+            )}
             <div className="flex justify-between font-bold pt-1 border-t"><span>Grand Total</span><span className="font-mono text-primary">{formatINR(grandTotal)}</span></div>
           </div>
         </div>

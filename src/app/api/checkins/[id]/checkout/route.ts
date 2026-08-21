@@ -17,6 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Allow custom GST rates — defaults to config values
   const customCgstRate = body.cgstRate != null ? Math.max(0, Math.min(100, Number(body.cgstRate))) : null
   const customSgstRate = body.sgstRate != null ? Math.max(0, Math.min(100, Number(body.sgstRate))) : null
+  const customIgstRate = body.igstRate != null ? Math.max(0, Math.min(100, Number(body.igstRate))) : null
 
   const checkIn = await db.checkIn.findUnique({
     where: { id },
@@ -50,9 +51,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Use custom rates if provided, else fall back to config
   const cgstRate = customCgstRate != null ? customCgstRate : (config?.cgstRate ?? 9)
   const sgstRate = customSgstRate != null ? customSgstRate : (config?.sgstRate ?? 9)
-  const cgstAmount = Math.round(taxableAmount * cgstRate) / 100
-  const sgstAmount = Math.round(taxableAmount * sgstRate) / 100
-  const grandTotal = taxableAmount + cgstAmount + sgstAmount
+  const igstRate = customIgstRate ?? 0
+  // If IGST is set, CGST/SGST are 0 (inter-state billing)
+  const effectiveCgstRate = igstRate > 0 ? 0 : cgstRate
+  const effectiveSgstRate = igstRate > 0 ? 0 : sgstRate
+  const cgstAmount = Math.round(taxableAmount * effectiveCgstRate) / 100
+  const sgstAmount = Math.round(taxableAmount * effectiveSgstRate) / 100
+  const igstAmount = Math.round(taxableAmount * igstRate) / 100
+  const grandTotal = taxableAmount + cgstAmount + sgstAmount + igstAmount
   const balanceDue = Math.max(0, grandTotal - checkIn.advanceAmount)
 
   let invoice = checkIn.hotelInvoice
@@ -76,8 +82,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         extraCharges,
         discount,
         taxableAmount,
-        cgstRate,
-        sgstRate,
+        cgstRate: effectiveCgstRate,
+        sgstRate: effectiveSgstRate,
         cgstAmount,
         sgstAmount,
         grandTotal,

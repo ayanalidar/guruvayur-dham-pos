@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { generateNumber } from '@/lib/pos-utils'
 
 // GET /api/invoices/custom — list all custom invoices
 export async function GET() {
@@ -12,10 +11,16 @@ export async function GET() {
 }
 
 // POST /api/invoices/custom — create a new custom invoice
-// Body: { customerName, customerPhone?, customerAddress?, items: [{name, quantity, rate}], discount?, cgstRate?, sgstRate?, paymentMethod?, notes? }
+// Custom invoices use their own numbering (user-provided or auto-generated).
+// They do NOT share the counter with hotel/food invoices.
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { customerName, customerPhone, customerAddress, items, discount, cgstRate, sgstRate, paymentMethod, notes } = body
+  const {
+    customerName, customerPhone, customerAddress, customerGstIn,
+    checkInDate, checkOutDate,
+    items, discount, cgstRate, sgstRate, igstRate,
+    paymentMethod, notes, customInvoiceNumber,
+  } = body
 
   if (!customerName?.trim()) {
     return NextResponse.json({ error: 'customerName is required' }, { status: 400 })
@@ -39,13 +44,35 @@ export async function POST(req: NextRequest) {
   const itemsTotal = safeItems.reduce((s: number, it: any) => s + it.amount, 0)
   const safeDiscount = Math.max(0, Math.min(itemsTotal, Number(discount) || 0))
   const taxable = Math.max(0, itemsTotal - safeDiscount)
+
+  // Tax calculation: either CGST+SGST (intra-state) OR IGST (inter-state)
   const cRate = Math.max(0, Math.min(100, Number(cgstRate) || 0))
   const sRate = Math.max(0, Math.min(100, Number(sgstRate) || 0))
-  const cgstAmount = Math.round(taxable * cRate) / 100
-  const sgstAmount = Math.round(taxable * sRate) / 100
-  const grandTotal = taxable + cgstAmount + sgstAmount
+  const iRate = Math.max(0, Math.min(100, Number(igstRate) || 0))
 
-  const invoiceNumber = await generateNumber('HOT') // uses same counter as hotel invoices
+  const cgstAmount = iRate > 0 ? 0 : Math.round(taxable * cRate) / 100
+  const sgstAmount = iRate > 0 ? 0 : Math.round(taxable * sRate) / 100
+  const igstAmount = iRate > 0 ? Math.round(taxable * iRate) / 100 : 0
+  const grandTotal = taxable + cgstAmount + sgstAmount + igstAmount
+
+  // Invoice number: use custom number if provided, else auto-generate
+  let invoiceNumber = ''
+  if (customInvoiceNumber?.trim()) {
+    invoiceNumber = String(customInvoiceNumber).trim().slice(0, 50)
+    // Check uniqueness
+    const exists = await db.customInvoice.findFirst({ where: { invoiceNumber } })
+    if (exists) {
+      return NextResponse.json({ error: `Invoice number ${invoiceNumber} already exists` }, { status: 400 })
+    }
+  } else {
+    // Auto-generate: find the highest numeric invoice number and increment
+    const all = await db.customInvoice.findMany({ select: { invoiceNumber: true } })
+    const maxNum = all.reduce((max, inv) => {
+      const n = parseInt(inv.invoiceNumber, 10)
+      return isNaN(n) ? max : Math.max(max, n)
+    }, 0)
+    invoiceNumber = String(maxNum + 1)
+  }
 
   const invoice = await db.customInvoice.create({
     data: {
@@ -53,12 +80,17 @@ export async function POST(req: NextRequest) {
       customerName: String(customerName).trim().slice(0, 200),
       customerPhone: customerPhone ? String(customerPhone).trim().slice(0, 20) : null,
       customerAddress: customerAddress ? String(customerAddress).trim().slice(0, 500) : null,
+      customerGstIn: customerGstIn ? String(customerGstIn).trim().slice(0, 20) : null,
+      checkInDate: checkInDate ? new Date(checkInDate) : null,
+      checkOutDate: checkOutDate ? new Date(checkOutDate) : null,
       items: safeItems,
       itemsTotal,
       cgstRate: cRate,
       sgstRate: sRate,
+      igstRate: iRate,
       cgstAmount,
       sgstAmount,
+      igstAmount,
       grandTotal,
       discount: safeDiscount,
       paymentMethod: paymentMethod || null,
