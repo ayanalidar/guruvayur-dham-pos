@@ -22,7 +22,7 @@ type HotelInvoice = {
   roomNumber: string; roomType: string; checkInAt: string; checkOutAt: string
   nights: number; ratePerNight: number; roomCharges: number; foodCharges: number
   extraCharges: number; discount: number; taxableAmount: number
-  cgstRate: number; sgstRate: number; cgstAmount: number; sgstAmount: number
+  cgstRate: number; sgstRate: number; igstRate?: number; cgstAmount: number; sgstAmount: number; igstAmount?: number
   grandTotal: number; advancePaid: number; balanceDue: number
   paymentMethod: string | null; notes: string | null; createdAt: string
   checkIn?: {
@@ -36,7 +36,7 @@ type HotelInvoice = {
 type FoodInvoice = {
   id: string; invoiceNumber: string; customerName: string; roomNumber: string | null
   tableNumber: string | null; orderType: string
-  itemsTotal: number; cgstRate: number; sgstRate: number; cgstAmount: number; sgstAmount: number
+  itemsTotal: number; cgstRate: number; sgstRate: number; igstRate?: number; cgstAmount: number; sgstAmount: number; igstAmount?: number
   grandTotal: number; paymentMethod: string | null; notes: string | null; createdAt: string
   order: {
     id: string; orderNumber: string
@@ -387,11 +387,15 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
       (Number(f.extraCharges) || 0) -
       (Number(f.discount) || 0)
     )
-    const cgstAmt = Math.round(taxable * (Number(f.cgstRate) || 0)) / 100
-    const sgstAmt = Math.round(taxable * (Number(f.sgstRate) || 0)) / 100
-    const grand = taxable + cgstAmt + sgstAmt
+    const iRate = Number(f.igstRate) || 0
+    const cRate = iRate > 0 ? 0 : (Number(f.cgstRate) || 0)
+    const sRate = iRate > 0 ? 0 : (Number(f.sgstRate) || 0)
+    const cgstAmt = Math.round(taxable * cRate) / 100
+    const sgstAmt = Math.round(taxable * sRate) / 100
+    const igstAmt = Math.round(taxable * iRate) / 100
+    const grand = taxable + cgstAmt + sgstAmt + igstAmt
     const balance = Math.max(0, grand - (Number(f.advancePaid) || 0))
-    return { ...f, taxableAmount: taxable, cgstAmount: cgstAmt, sgstAmount: sgstAmt, grandTotal: grand, balanceDue: balance }
+    return { ...f, cgstRate: cRate, sgstRate: sRate, igstRate: iRate, taxableAmount: taxable, cgstAmount: cgstAmt, sgstAmount: sgstAmt, igstAmount: igstAmt, grandTotal: grand, balanceDue: balance }
   }
 
   return (
@@ -450,6 +454,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
               <Field label="Advance Paid (₹)"><Input type="number" value={form.advancePaid} onChange={e => setForm(recompute({ ...form, advancePaid: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="CGST Rate (%)"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="SGST Rate (%)"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="IGST Rate (%)"><Input type="number" step="0.1" value={(form as any).igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value), cgstRate: Number(e.target.value) > 0 ? 0 : form.cgstRate, sgstRate: Number(e.target.value) > 0 ? 0 : form.sgstRate }) as any)} className="h-7 text-xs" placeholder="0" /></Field>
               <Field label="Payment Method">
                 <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
                   <option value="">—</option>
@@ -553,6 +558,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
                 { label: 'Taxable Amount', value: Number(form.taxableAmount) || 0 },
                 ...(Number(form.cgstAmount) > 0 ? [{ label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) }] : []),
                 ...(Number(form.sgstAmount) > 0 ? [{ label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) }] : []),
+                ...(Number((form as any).igstAmount) > 0 ? [{ label: `IGST (${(form as any).igstRate}%)`, value: Number((form as any).igstAmount) }] : []),
                 { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
                 { label: 'Advance Paid', value: -(Number(form.advancePaid) || 0), muted: true, emerald: true },
                 { label: 'Balance Due', value: Number(form.balanceDue) || 0, bold: true, primary: true },
@@ -560,6 +566,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
                 { label: 'Taxable Amount', value: invoice.taxableAmount },
                 ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
                 ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
+                ...((invoice as any).igstAmount > 0 ? [{ label: `IGST (${(invoice as any).igstRate}%)`, value: (invoice as any).igstAmount }] : []),
                 { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
                 { label: 'Advance Paid', value: -invoice.advancePaid, muted: true, emerald: true },
                 { label: 'Balance Due', value: invoice.balanceDue, bold: true, primary: true },
@@ -725,10 +732,14 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
 
   function recompute(f: any) {
     const taxable = Number(f.itemsTotal) || 0
-    const cgstAmt = Math.round(taxable * (Number(f.cgstRate) || 0)) / 100
-    const sgstAmt = Math.round(taxable * (Number(f.sgstRate) || 0)) / 100
-    const grand = taxable + cgstAmt + sgstAmt
-    return { ...f, cgstAmount: cgstAmt, sgstAmount: sgstAmt, grandTotal: grand }
+    const iRate = Number(f.igstRate) || 0
+    const cRate = iRate > 0 ? 0 : (Number(f.cgstRate) || 0)
+    const sRate = iRate > 0 ? 0 : (Number(f.sgstRate) || 0)
+    const cgstAmt = Math.round(taxable * cRate) / 100
+    const sgstAmt = Math.round(taxable * sRate) / 100
+    const igstAmt = Math.round(taxable * iRate) / 100
+    const grand = taxable + cgstAmt + sgstAmt + igstAmt
+    return { ...f, cgstRate: cRate, sgstRate: sRate, igstRate: iRate, cgstAmount: cgstAmt, sgstAmount: sgstAmt, igstAmount: igstAmt, grandTotal: grand }
   }
 
   return (
@@ -783,6 +794,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
               <Field label="Items Total (₹)"><Input type="number" value={form.itemsTotal} onChange={e => setForm(recompute({ ...form, itemsTotal: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="CGST Rate (%)"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="SGST Rate (%)"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="IGST Rate (%)"><Input type="number" step="0.1" value={(form as any).igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value), cgstRate: Number(e.target.value) > 0 ? 0 : form.cgstRate, sgstRate: Number(e.target.value) > 0 ? 0 : form.sgstRate }) as any)} className="h-7 text-xs" placeholder="0" /></Field>
               <Field label="Payment Method">
                 <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
                   <option value="">—</option>
@@ -845,13 +857,15 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             <InvoiceTotals
               rows={editMode ? [
                 { label: 'Taxable Amount', value: Number(form.itemsTotal) || 0 },
-                { label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) || 0 },
-                { label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) || 0 },
+                ...(Number(form.cgstAmount) > 0 ? [{ label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) }] : []),
+                ...(Number(form.sgstAmount) > 0 ? [{ label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) }] : []),
+                ...(Number((form as any).igstAmount) > 0 ? [{ label: `IGST (${(form as any).igstRate}%)`, value: Number((form as any).igstAmount) }] : []),
                 { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
               ] : [
                 { label: 'Taxable Amount', value: invoice.itemsTotal },
                 ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate.toFixed(1)}%)`, value: invoice.cgstAmount }] : []),
                 ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate.toFixed(1)}%)`, value: invoice.sgstAmount }] : []),
+                ...((invoice as any).igstAmount > 0 ? [{ label: `IGST (${(invoice as any).igstRate}%)`, value: (invoice as any).igstAmount }] : []),
                 { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
               ]}
             />

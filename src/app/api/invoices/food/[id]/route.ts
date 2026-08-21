@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Numeric fields
-  const numFields = ['itemsTotal', 'cgstRate', 'sgstRate', 'cgstAmount', 'sgstAmount', 'grandTotal']
+  const numFields = ['itemsTotal', 'cgstRate', 'sgstRate', 'igstRate', 'cgstAmount', 'sgstAmount', 'igstAmount', 'grandTotal']
   for (const k of numFields) {
     if (body[k] != null) data[k] = Number(body[k])
   }

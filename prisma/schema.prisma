@@ -114,6 +114,7 @@ model FoodOrder {
   itemsTotal    Float    @default(0)
   cgstAmount    Float    @default(0)
   sgstAmount    Float    @default(0)
+  igstAmount    Float    @default(0)
   grandTotal    Float    @default(0)
   notes         String?
   items         FoodOrderItem[]
@@ -156,8 +157,10 @@ model HotelInvoice {
   taxableAmount   Float
   cgstRate        Float
   sgstRate        Float
+  igstRate        Float    @default(0)
   cgstAmount      Float
   sgstAmount      Float
+  igstAmount      Float    @default(0)
   grandTotal      Float
   advancePaid     Float
   balanceDue      Float
@@ -179,8 +182,10 @@ model FoodInvoice {
   itemsTotal      Float
   cgstRate        Float
   sgstRate        Float
+  igstRate        Float    @default(0)
   cgstAmount      Float
   sgstAmount      Float
+  igstAmount      Float    @default(0)
   grandTotal      Float
   paymentMethod   String?
   notes           String?

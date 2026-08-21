@@ -32,13 +32,13 @@ export async function downloadHotelInvoices() {
   downloadCSV('hotel-invoices.csv', [
     'Invoice No', 'Date', 'Guest Name', 'Phone', 'Room', 'Room Type',
     'Nights', 'Rate/Night', 'Room Charges', 'Food Charges', 'Extra Charges',
-    'Discount', 'Taxable', 'CGST Rate', 'CGST Amount', 'SGST Rate', 'SGST Amount',
+    'Discount', 'Taxable', 'CGST Rate', 'CGST Amount', 'SGST Rate', 'SGST Amount', 'IGST Rate', 'IGST Amount',
     'Grand Total', 'Advance Paid', 'Balance Due', 'Payment Method', 'Status'
   ], data.invoices.map((inv: any) => [
     inv.invoiceNumber, formatDateShort(inv.createdAt), inv.guestName, inv.guestPhone,
     inv.roomNumber, inv.roomType, inv.nights, inv.ratePerNight,
     inv.roomCharges, inv.foodCharges, inv.extraCharges, inv.discount, inv.taxableAmount,
-    inv.cgstRate, inv.cgstAmount, inv.sgstRate, inv.sgstAmount,
+    inv.cgstRate, inv.cgstAmount, inv.sgstRate, inv.sgstAmount, inv.igstRate || 0, inv.igstAmount || 0,
     inv.grandTotal, inv.advancePaid, inv.balanceDue, inv.paymentMethod || '',
     inv.balanceDue > 0 ? 'Due' : 'Paid'
   ]))
@@ -50,11 +50,11 @@ export async function downloadFoodInvoices() {
   const data = await res.json()
   downloadCSV('food-invoices.csv', [
     'Invoice No', 'Date', 'Customer Name', 'Room/Table', 'Order Type',
-    'Items Total', 'CGST Amount', 'SGST Amount', 'Grand Total', 'Payment Method'
+    'Items Total', 'CGST Amount', 'SGST Amount', 'IGST Amount', 'Grand Total', 'Payment Method'
   ], data.invoices.map((inv: any) => [
     inv.invoiceNumber, formatDateShort(inv.createdAt), inv.customerName,
     inv.roomNumber || inv.tableNumber || '', inv.orderType,
-    inv.itemsTotal, inv.cgstAmount, inv.sgstAmount, inv.grandTotal, inv.paymentMethod || ''
+    inv.itemsTotal, inv.cgstAmount, inv.sgstAmount, inv.igstAmount || 0, inv.grandTotal, inv.paymentMethod || ''
   ]))
 }
 
