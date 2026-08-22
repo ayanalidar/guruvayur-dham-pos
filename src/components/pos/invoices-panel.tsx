@@ -1363,14 +1363,14 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" /> New Custom Invoice
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="flex-1 overflow-y-auto py-2 space-y-4">
           {/* Invoice number + Customer details */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Invoice Number (leave blank for auto)">
@@ -1471,7 +1471,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submit} disabled={submitting}>
             {submitting ? 'Creating...' : `Create Invoice (${formatINR(grandTotal)})`}
@@ -1500,12 +1500,12 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
       <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" /> Custom Invoice #{invoice.invoiceNumber}
+            <FileText className="h-5 w-5" /> Invoice #{invoice.invoiceNumber}
           </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
-          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="CUSTOM INVOICE" copyNote="Original" />
+          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="INVOICE" copyNote="Original" />
 
           {/* Customer details */}
           <div className="mt-3 mb-3 space-y-1">
