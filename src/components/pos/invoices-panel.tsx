@@ -1181,7 +1181,6 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
         <p className="mt-1">All disputes are subject to the jurisdiction of Mathura, Uttar Pradesh Only.</p>
         <p className="mt-2">
           Powered By: <strong className="font-semibold text-blue-600">GuardianX</strong>
-          {' '}(<a href="https://www.guardianx.in" target="_blank" rel="noopener" className="text-blue-600 underline">www.guardianx.in</a>)
         </p>
       </div>
     </div>

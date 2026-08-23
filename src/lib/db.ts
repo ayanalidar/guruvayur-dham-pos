@@ -38,6 +38,7 @@ export async function ensureSeeded() {
           sacCode: '996311',
           cgstRate: 9.0,
           sgstRate: 9.0,
+          igstRate: 0.0,
           posPin: '1234',
           reviewLink: 'https://share.google/5fv3gDrquFN8LT1xb',
           bankName: 'AU Small Finance Bank',

@@ -574,8 +574,9 @@ function CheckoutDialog({ open, onOpenChange, room, onDone }: {
         apiFetch<{ config: any }>(`/api/config`),
       ]).then(([d, cfg]) => {
         // Set tax rates from hotel config
-        if (cfg.config?.cgstRate) setCgstRate(cfg.config.cgstRate)
-        if (cfg.config?.sgstRate) setSgstRate(cfg.config.sgstRate)
+        if (cfg.config?.cgstRate != null) setCgstRate(cfg.config.cgstRate)
+        if (cfg.config?.sgstRate != null) setSgstRate(cfg.config.sgstRate)
+        if (cfg.config?.igstRate != null) setIgstRate(cfg.config.igstRate)
         const ci = d.checkIns.find(c => c.roomId === room.id)
         if (ci) {
           const nights = Math.max(1, Math.ceil((Date.now() - new Date(ci.checkInAt).getTime()) / 86400000))

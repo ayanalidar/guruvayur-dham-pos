@@ -224,12 +224,15 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               <Input value={config.sacCode || ''} onChange={e => setConfig({ ...config, sacCode: e.target.value })} />
             </FieldRow>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <FieldRow label="CGST Rate (%)">
               <Input type="number" step="0.1" value={config.cgstRate ?? 9} onChange={e => setConfig({ ...config, cgstRate: Number(e.target.value) })} />
             </FieldRow>
             <FieldRow label="SGST Rate (%)">
               <Input type="number" step="0.1" value={config.sgstRate ?? 9} onChange={e => setConfig({ ...config, sgstRate: Number(e.target.value) })} />
+            </FieldRow>
+            <FieldRow label="IGST Rate (%)">
+              <Input type="number" step="0.1" value={config.igstRate ?? 0} onChange={e => setConfig({ ...config, igstRate: Number(e.target.value) })} />
             </FieldRow>
           </div>
           <FieldRow label="POS Login PIN (4-6 digits)">
