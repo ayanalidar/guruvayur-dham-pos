@@ -34,7 +34,7 @@ export async function ensureSeeded() {
           address: '88/306 Mali Para, Opp. Pathway Mata Mandir, Dholi Pyau, Mathura, Uttar Pradesh - 281001',
           phone: '+91 8445555554, +91 9410077786',
           email: 'Guruvayurdham@gmail.com',
-          gstNumber: '09AABFG2373H1ZG',
+          gstNumber: '09ABAFG2373H1ZG',
           sacCode: '996311',
           cgstRate: 9.0,
           sgstRate: 9.0,

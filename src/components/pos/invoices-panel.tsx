@@ -1175,11 +1175,14 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
         </a>
       </div>
 
-      {/* GuardianX brand — minimal, centered, very small */}
-      <div className="mt-4 pt-2 border-t border-dashed text-center text-[10px] text-muted-foreground flex items-center justify-center gap-1">
-        <Shield className="h-3 w-3" />
-        <span>Made &amp; Maintained by</span>
-        <strong className="font-semibold">GuardianX</strong>
+      {/* Footer — matches actual invoice format */}
+      <div className="mt-4 pt-2 border-t text-center text-[10px] text-muted-foreground">
+        <p>This is an auto-generated copy, doesn't require any signature.</p>
+        <p className="mt-1">All disputes are subject to the jurisdiction of Mathura, Uttar Pradesh Only.</p>
+        <p className="mt-2">
+          Powered By: <strong className="font-semibold text-blue-600">GuardianX</strong>
+          {' '}(<a href="https://www.guardianx.in" target="_blank" rel="noopener" className="text-blue-600 underline">www.guardianx.in</a>)
+        </p>
       </div>
     </div>
   )

@@ -49,37 +49,78 @@ export function printInvoice() {
   <title>Invoice</title>
   ${styles}
   <style>
-    /* Reset — use the invoice's own styles, don't override */
+    /* Reset */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       background: white;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      font-family: Arial, Helvetica, sans-serif;
     }
 
-    /* The invoice container — same as on screen but constrained to A4 */
-    .invoice-print {
-      max-width: 190mm !important;
-      margin: 0 auto !important;
-      padding: 8mm !important;
-    }
-
-    /* Scale everything down slightly to fit A4 */
-    .invoice-print {
-      transform: scale(0.85);
-      transform-origin: top center;
-    }
-
-    /* A4 page setup */
+    /* A4: 210mm x 297mm. With 5mm margins = 200mm x 287mm usable */
     @page {
       size: A4;
       margin: 5mm;
     }
 
+    /* Invoice container — fit within A4 printable area */
+    .invoice-print {
+      max-width: 200mm !important;
+      margin: 0 auto !important;
+      padding: 4mm !important;
+      font-size: 10px !important;
+      line-height: 1.25 !important;
+    }
+
+    /* Scale down headings */
+    .invoice-print h1 { font-size: 14px !important; }
+    .invoice-print h2 { font-size: 11px !important; }
+    .invoice-print h3 { font-size: 10px !important; }
+
+    /* Compact table */
+    .invoice-print table { font-size: 9px !important; }
+    .invoice-print th { padding: 2px 3px !important; font-size: 8px !important; }
+    .invoice-print td { padding: 2px 3px !important; }
+
+    /* Reduce spacing */
+    .invoice-print .mt-6 { margin-top: 4px !important; }
+    .invoice-print .mt-4 { margin-top: 3px !important; }
+    .invoice-print .mt-3 { margin-top: 2px !important; }
+    .invoice-print .mt-2 { margin-top: 2px !important; }
+    .invoice-print .pt-3 { padding-top: 3px !important; }
+    .invoice-print .pt-2 { padding-top: 2px !important; }
+    .invoice-print .p-4 { padding: 4px !important; }
+    .invoice-print .p-3 { padding: 3px !important; }
+    .invoice-print .p-2 { padding: 2px !important; }
+    .invoice-print .mb-4 { margin-bottom: 3px !important; }
+    .invoice-print .mb-3 { margin-bottom: 2px !important; }
+    .invoice-print .py-2 { padding-top: 2px !important; padding-bottom: 2px !important; }
+
+    /* Compact text sizes */
+    .invoice-print .text-\\[10px\\] { font-size: 8px !important; }
+    .invoice-print .text-xs { font-size: 9px !important; }
+    .invoice-print .text-sm { font-size: 10px !important; }
+    .invoice-print .text-base { font-size: 11px !important; }
+
+    /* Compact totals */
+    .invoice-print .ml-auto { width: 180px !important; font-size: 9px !important; }
+
+    /* Logo */
+    .invoice-print img { max-height: 35px !important; max-width: 50px !important; }
+
+    /* QR code */
+    .invoice-print svg { max-width: 40px !important; max-height: 40px !important; }
+
+    /* Signature arch */
+    .invoice-print .w-32 { width: 70px !important; height: 25px !important; }
+
+    /* Hide non-print elements */
+    .no-print { display: none !important; }
+
     @media print {
       body { background: white; }
-      .no-print { display: none !important; }
     }
   </style>
 </head>
