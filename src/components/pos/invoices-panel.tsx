@@ -1329,6 +1329,19 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
     }
   }, [open])
 
+  // Auto-calculate nights from check-in/check-out dates
+  const nights = ((form as any).checkInDate && (form as any).checkOutDate)
+    ? Math.max(1, Math.ceil((new Date((form as any).checkOutDate).getTime() - new Date((form as any).checkInDate).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0
+
+  // When nights > 0, auto-update the first item's quantity to match nights
+  // This ensures room charges = rate × nights
+  useEffect(() => {
+    if (nights > 0 && items.length > 0 && items[0].quantity !== nights) {
+      setItems(prev => prev.map((it, i) => i === 0 ? { ...it, quantity: nights } : it))
+    }
+  }, [nights])
+
   const itemsTotal = items.reduce((s, it) => s + (it.rate * it.quantity), 0)
   const taxable = Math.max(0, itemsTotal - (Number(form.discount) || 0))
   const useIgst = Number((form as any).igstRate) > 0
@@ -1396,14 +1409,22 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
           <Field label="Address (optional)">
             <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="Check-in Date (optional)">
               <Input type="date" value={(form as any).checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value } as any)} />
             </Field>
             <Field label="Check-out Date (optional)">
               <Input type="date" value={(form as any).checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value } as any)} />
             </Field>
+            <Field label="Nights (auto)">
+              <Input type="number" value={nights || ''} readOnly className="bg-muted/50" placeholder="—" />
+            </Field>
           </div>
+          {nights > 0 && (
+            <p className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2">
+              ✓ {nights} night(s) detected — first item quantity auto-set to {nights}. Rate × {nights} nights = total room charges.
+            </p>
+          )}
 
           {/* Items builder */}
           <div>
