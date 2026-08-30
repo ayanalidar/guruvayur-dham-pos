@@ -486,7 +486,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           )}
 
           {/* Itemized table */}
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif", tableLayout: 'fixed', wordWrap: 'break-word' }}>
             <thead>
               <tr className="bg-gray-200 border-b border-black">
                 <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
@@ -826,7 +826,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             </div>
           )}
 
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif", tableLayout: 'fixed', wordWrap: 'break-word' }}>
             <thead>
               <tr className="bg-gray-200 border-b border-black">
                 <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
@@ -1060,7 +1060,7 @@ function InvoiceTotals({ rows }: {
   rows: Array<{ label: string; value: number; bold?: boolean; muted?: boolean; emerald?: boolean; primary?: boolean; doubleTop?: boolean }>
 }) {
   return (
-    <div className="ml-auto w-72 text-xs" style={{ fontFamily: 'Arial, sans-serif' }}>
+    <div className="ml-auto w-72 text-xs" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
       {rows.map((r, i) => (
         <div
           key={i}
@@ -1099,7 +1099,7 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
       {(hasBankDetails || reviewLink) && (
         <div className="grid grid-cols-[1fr_auto] gap-4 items-start mb-4 pb-3 border-b border-dashed border-gray-300">
           {/* Left: Bank details */}
-          <div className="text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+          <div className="text-[10px]" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
             {hasBankDetails ? (
               <>
                 <p className="font-bold underline mb-1">Bank Details:</p>
@@ -1124,7 +1124,7 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
       {/* Three-zone footer: Terms | Customer Signature arch | For Hotel Name */}
       <div className="grid grid-cols-3 gap-4 items-end">
         {/* Left: Terms */}
-        <div className="text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="text-[10px]" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
           <p className="font-bold">E. & O. E.</p>
           <p className="font-bold mt-1">Terms &amp; Conditions:</p>
           <p className="text-muted-foreground">1. Subjected to Mathura jurisdiction only.</p>
@@ -1199,8 +1199,11 @@ function WhatsAppIcon({ className = '' }: { className?: string }) {
 // ====== Custom Invoices Tab ======
 type CustomInvoice = {
   id: string; invoiceNumber: string; customerName: string; customerPhone: string | null
-  customerAddress: string | null; items: any[]; itemsTotal: number
-  cgstRate: number; sgstRate: number; cgstAmount: number; sgstAmount: number
+  customerAddress: string | null; customerGstIn: string | null
+  checkInDate: string | null; checkOutDate: string | null
+  items: any[]; itemsTotal: number
+  cgstRate: number; sgstRate: number; igstRate?: number
+  cgstAmount: number; sgstAmount: number; igstAmount?: number
   grandTotal: number; discount: number; paymentMethod: string | null; notes: string | null
   createdAt: string
 }
@@ -1319,7 +1322,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
     if (open) {
       apiFetch<{ config: any }>('/api/config').then(d => {
         setConfig(d.config)
-        setForm(f => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9 }))
+        setForm(f => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9, igstRate: d.config?.igstRate ?? 0 }))
       }).catch(() => {})
       setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
       setItems([{ name: '', quantity: 1, rate: 0 }])
@@ -1488,41 +1491,194 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
 function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | null; onClose: () => void }) {
   const [config, setConfig] = useState<Config | null>(null)
   const { toast } = useToast()
+  const [editMode, setEditMode] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<any>(null)
 
   useEffect(() => {
     apiFetch<{ config: Config }>('/api/config').then(d => setConfig(d.config)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (invoice) {
+      setEditMode(false)
+      setForm({
+        invoiceNumber: invoice.invoiceNumber,
+        customerName: invoice.customerName,
+        customerPhone: invoice.customerPhone || '',
+        customerAddress: invoice.customerAddress || '',
+        customerGstIn: invoice.customerGstIn || '',
+        checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 10) : '',
+        checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 10) : '',
+        items: invoice.items || [],
+        itemsTotal: invoice.itemsTotal,
+        cgstRate: invoice.cgstRate,
+        sgstRate: invoice.sgstRate,
+        igstRate: invoice.igstRate || 0,
+        cgstAmount: invoice.cgstAmount,
+        sgstAmount: invoice.sgstAmount,
+        igstAmount: invoice.igstAmount || 0,
+        grandTotal: invoice.grandTotal,
+        discount: invoice.discount,
+        paymentMethod: invoice.paymentMethod || '',
+        notes: invoice.notes || '',
+      })
+    }
+  }, [invoice?.id])
+
   if (!invoice) return null
 
-  const items: any[] = invoice.items as any[] || []
+  const safeForm = form || {
+    invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName,
+    customerPhone: invoice.customerPhone || '', customerAddress: invoice.customerAddress || '',
+    customerGstIn: invoice.customerGstIn || '', checkInDate: invoice.checkInDate || '',
+    checkOutDate: invoice.checkOutDate || '', items: invoice.items || [],
+    itemsTotal: invoice.itemsTotal, cgstRate: invoice.cgstRate, sgstRate: invoice.sgstRate,
+    igstRate: invoice.igstRate || 0, cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount,
+    igstAmount: invoice.igstAmount || 0, grandTotal: invoice.grandTotal, discount: invoice.discount,
+    paymentMethod: invoice.paymentMethod || '', notes: invoice.notes || '',
+  }
+
+  const items: any[] = editMode ? (safeForm.items || []) : (invoice.items as any[] || [])
+
+  // Calculate nights from check-in/check-out
+  const ciDate = editMode ? safeForm.checkInDate : invoice.checkInDate
+  const coDate = editMode ? safeForm.checkOutDate : invoice.checkOutDate
+  const nights = (ciDate && coDate) ? Math.max(1, Math.ceil((new Date(coDate).getTime() - new Date(ciDate).getTime()) / (1000 * 60 * 60 * 24))) : 0
+
+  function recompute(f: any) {
+    const itemsTotal = (f.items || []).reduce((s: number, it: any) => s + (it.rate * it.quantity), 0)
+    const taxable = Math.max(0, itemsTotal - (Number(f.discount) || 0))
+    const iRate = Number(f.igstRate) || 0
+    const cRate = iRate > 0 ? 0 : (Number(f.cgstRate) || 0)
+    const sRate = iRate > 0 ? 0 : (Number(f.sgstRate) || 0)
+    const cgstAmt = Math.round(taxable * cRate) / 100
+    const sgstAmt = Math.round(taxable * sRate) / 100
+    const igstAmt = Math.round(taxable * iRate) / 100
+    const grand = taxable + cgstAmt + sgstAmt + igstAmt
+    return { ...f, itemsTotal, cgstRate: cRate, sgstRate: sRate, igstRate: iRate, cgstAmount: cgstAmt, sgstAmount: sgstAmt, igstAmount: igstAmt, grandTotal: grand }
+  }
+
+  async function saveEdit() {
+    if (!invoice || !form) return
+    setSaving(true)
+    try {
+      const r = await apiFetch<{ invoice: CustomInvoice }>(`/api/invoices/custom/${invoice.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(form),
+      })
+      Object.assign(invoice, r.invoice)
+      setEditMode(false)
+      window.dispatchEvent(new CustomEvent('invoice-updated'))
+      toast({ title: 'Invoice updated' })
+    } catch (e: any) {
+      toast({ title: 'Failed to save', description: e.message, variant: 'destructive' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function updateItem(idx: number, field: string, value: any) {
+    setForm((prev: any) => {
+      const newItems = [...(prev?.items || [])]
+      newItems[idx] = { ...newItems[idx], [field]: field === 'name' ? value : Number(value) || 0 }
+      return recompute({ ...prev, items: newItems })
+    })
+  }
+  function addItem() {
+    setForm((prev: any) => ({ ...prev, items: [...(prev?.items || []), { name: '', quantity: 1, rate: 0 }] }))
+  }
+  function removeItem(idx: number) {
+    setForm((prev: any) => {
+      const newItems = (prev?.items || []).filter((_: any, i: number) => i !== idx)
+      return recompute({ ...prev, items: newItems })
+    })
+  }
 
   return (
     <Dialog open={!!invoice} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" /> Invoice #{invoice.invoiceNumber}
+          <DialogTitle className="flex items-center gap-2 justify-between">
+            <span className="flex items-center gap-2">
+              <FileText className="h-5 w-5" /> Invoice #{invoice.invoiceNumber}
+            </span>
+            {!editMode ? (
+              <Button size="sm" variant="outline" onClick={() => setEditMode(true)}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit Invoice
+              </Button>
+            ) : (
+              <div className="flex gap-1 no-print">
+                <Button size="sm" variant="ghost" onClick={() => setEditMode(false)} disabled={saving}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Cancel
+                </Button>
+                <Button size="sm" onClick={saveEdit} disabled={saving}>
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            )}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
-          <InvoiceHeader config={config} invoiceNumber={invoice.invoiceNumber} title="INVOICE" copyNote="Original" />
+        <div className="flex-1 overflow-y-auto">
+        <div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word', fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
+          <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" />
 
-          {/* Customer details */}
-          <div className="mt-3 mb-3 space-y-1">
-            <LeaderRow>
-              <LeaderField label="Name" value={invoice.customerName} />
-              <LeaderField label="Mob" value={invoice.customerPhone || '—'} width="w-44" />
-            </LeaderRow>
-            <LeaderRow>
-              <LeaderField label="Address" value={invoice.customerAddress || '—'} />
-              <LeaderField label="Date" value={formatDateShort(invoice.createdAt)} width="w-48" />
-            </LeaderRow>
-          </div>
+          {/* Customer details — same format as hotel invoice */}
+          {editMode && form ? (
+            <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
+              <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Phone"><Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="GSTIN"><Input value={form.customerGstIn} onChange={e => setForm({ ...form, customerGstIn: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Address"><Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Payment Method">
+                <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
+                  <option value="">—</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </Field>
+              <Field label="Check-in Date"><Input type="date" value={form.checkInDate} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Check-out Date"><Input type="date" value={form.checkOutDate} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Discount (₹)"><Input type="number" value={form.discount} onChange={e => setForm(recompute({ ...form, discount: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="CGST %"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="SGST %"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="IGST %"><Input type="number" step="0.1" value={form.igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value) }))} className="h-7 text-xs" placeholder="0" /></Field>
+              <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
+            </div>
+          ) : (
+            <div className="mt-3 mb-3 space-y-1">
+              <LeaderRow>
+                <LeaderField label="Name" value={invoice.customerName} />
+                <LeaderField label="Mob" value={invoice.customerPhone || '—'} width="w-44" />
+              </LeaderRow>
+              {invoice.customerGstIn && (
+                <LeaderRow>
+                  <LeaderField label="GSTIN" value={invoice.customerGstIn} />
+                  <LeaderField label="Address" value={invoice.customerAddress || '—'} width="w-48" />
+                </LeaderRow>
+              )}
+              {!invoice.customerGstIn && (
+                <LeaderRow>
+                  <LeaderField label="Address" value={invoice.customerAddress || '—'} />
+                  <LeaderField label="Date" value={formatDateShort(invoice.createdAt)} width="w-48" />
+                </LeaderRow>
+              )}
+              {ciDate && coDate && (
+                <LeaderRow>
+                  <LeaderField label="A/D Date" value={formatDateShort(ciDate)} width="w-40" />
+                  <LeaderField label="D/I Date" value={formatDateShort(coDate)} width="w-40" />
+                  {nights > 0 && <LeaderField label="Nights" value={String(nights)} width="w-24" />}
+                </LeaderRow>
+              )}
+            </div>
+          )}
 
-          {/* Items table */}
-          <table className="w-full text-xs border-collapse border border-black mt-3" style={{ fontFamily: 'Arial, sans-serif', tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          {/* Items table — editable in edit mode */}
+          <table className="w-full text-xs border-collapse border border-black mt-3" style={{ tableLayout: 'fixed', wordWrap: 'break-word' }}>
             <thead>
               <tr className="bg-gray-200 border-b border-black">
                 <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
@@ -1532,42 +1688,80 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               </tr>
             </thead>
             <tbody>
-              {items.map((it: any, idx: number) => (
-                <tr key={idx} className="border-b border-black">
-                  <td className="py-2 px-2 border-r border-black text-center">{idx + 1}</td>
-                  <td className="py-2 px-2 border-r border-black">{it.name}</td>
-                  <td className="text-right py-2 px-2 border-r border-black font-mono">{it.quantity} × {formatINR(it.rate)}</td>
-                  <td className="text-right py-2 px-2 font-mono">{formatINR(it.amount)}</td>
-                </tr>
-              ))}
-              {invoice.discount > 0 && (
+              {editMode && form ? (
+                <>
+                  {items.map((it: any, idx: number) => (
+                    <tr key={idx} className="border-b border-black">
+                      <td className="py-1 px-2 border-r border-black text-center">{idx + 1}</td>
+                      <td className="py-1 px-2 border-r border-black">
+                        <Input value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-6 text-xs border-0 bg-transparent" />
+                      </td>
+                      <td className="py-1 px-2 border-r border-black">
+                        <div className="flex gap-1">
+                          <Input type="number" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-6 text-xs w-12 border-0 bg-transparent" />
+                          <span className="text-xs self-center">×</span>
+                          <Input type="number" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-6 text-xs w-16 border-0 bg-transparent" />
+                        </div>
+                      </td>
+                      <td className="text-right py-1 px-2 font-mono">{formatINR((it.quantity || 0) * (it.rate || 0))}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={4} className="py-1 px-2">
+                      <Button size="sm" variant="ghost" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Add Item</Button>
+                    </td>
+                  </tr>
+                </>
+              ) : (
+                <>
+                  {items.map((it: any, idx: number) => (
+                    <tr key={idx} className="border-b border-black">
+                      <td className="py-2 px-2 border-r border-black text-center">{idx + 1}</td>
+                      <td className="py-2 px-2 border-r border-black">{it.name}</td>
+                      <td className="text-right py-2 px-2 border-r border-black font-mono">{it.quantity} × {formatINR(it.rate)}</td>
+                      <td className="text-right py-2 px-2 font-mono">{formatINR(it.amount || (it.quantity * it.rate))}</td>
+                    </tr>
+                  ))}
+                </>
+              )}
+              {(editMode ? Number(form.discount) : invoice.discount) > 0 && (
                 <tr className="border-b border-black">
                   <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Discount</td>
-                  <td className="text-right py-2 px-2 font-mono text-emerald-700">- {formatINR(invoice.discount)}</td>
+                  <td className="text-right py-2 px-2 font-mono text-emerald-700">- {formatINR(editMode ? Number(form.discount) : invoice.discount)}</td>
                 </tr>
               )}
               <tr className="border-t-2 border-black font-bold">
                 <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td>
-                <td className="text-right py-2 px-2 font-mono">{formatINR(invoice.itemsTotal - invoice.discount)}</td>
+                <td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.itemsTotal) - Number(form.discount) : invoice.itemsTotal - invoice.discount)}</td>
               </tr>
             </tbody>
           </table>
 
           {/* Tax breakdown */}
           <div className="mt-3 flex justify-end">
-            <InvoiceTotals rows={[
-              { label: 'Taxable Amount', value: invoice.itemsTotal - invoice.discount },
-              ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
-              ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
-              ...(invoice.igstAmount > 0 ? [{ label: `IGST (${invoice.igstRate}%)`, value: invoice.igstAmount }] : []),
-              { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
-            ]} />
+            <InvoiceTotals
+              rows={editMode ? [
+                { label: 'Taxable Amount', value: Number(form.itemsTotal) - Number(form.discount) || 0 },
+                ...(Number(form.cgstAmount) > 0 ? [{ label: `CGST (${form.cgstRate}%)`, value: Number(form.cgstAmount) }] : []),
+                ...(Number(form.sgstAmount) > 0 ? [{ label: `SGST (${form.sgstRate}%)`, value: Number(form.sgstAmount) }] : []),
+                ...(Number(form.igstAmount) > 0 ? [{ label: `IGST (${form.igstRate}%)`, value: Number(form.igstAmount) }] : []),
+                { label: 'G. TOTAL', value: Number(form.grandTotal) || 0, bold: true, doubleTop: true, primary: true },
+              ] : [
+                { label: 'Taxable Amount', value: invoice.itemsTotal - invoice.discount },
+                ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
+                ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
+                ...(invoice.igstAmount > 0 ? [{ label: `IGST (${invoice.igstRate}%)`, value: invoice.igstAmount }] : []),
+                { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
+              ]}
+            />
           </div>
 
-          {invoice.paymentMethod && (
-            <p className="text-xs mt-3">Payment Method: <strong>{invoice.paymentMethod}</strong></p>
+          {(editMode ? form.paymentMethod : invoice.paymentMethod) ? (
+            <p className="text-xs mt-3">Payment Method: <strong>{editMode ? form.paymentMethod : invoice.paymentMethod}</strong></p>
+          ) : null}
+          {(editMode ? form.notes : invoice.notes) && (
+            <p className="text-xs mt-1 text-muted-foreground italic">Notes: {editMode ? form.notes : invoice.notes}</p>
           )}
-          {invoice.notes && <p className="text-xs mt-1 text-muted-foreground italic">Notes: {invoice.notes}</p>}
 
           <InvoiceFooter config={config} />
         </div>
@@ -1575,10 +1769,10 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
         <DialogFooter className="no-print shrink-0">
           <Button variant="destructive" onClick={async () => {
-            if (!confirm('Delete this custom invoice permanently?')) return
+            if (!confirm('Delete this invoice permanently?')) return
             try {
               await apiFetch(`/api/invoices/custom/${invoice.id}`, { method: 'DELETE' })
-              toast({ title: 'Custom invoice deleted' })
+              toast({ title: 'Invoice deleted' })
               window.dispatchEvent(new CustomEvent('invoice-updated'))
               onClose()
             } catch (e: any) { toast({ title: 'Delete failed', description: e.message, variant: 'destructive' }) }
