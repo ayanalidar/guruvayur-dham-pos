@@ -87,9 +87,9 @@ export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
         {/* Hotel header */}
         <div className="text-center mb-6">
           <img
-            src="/gvd-logo.webp"
+            src="/guruvayur-logo.png"
             alt="Hotel Guruvayur Dham"
-            className="h-24 w-32 object-contain mx-auto mb-3"
+            className="h-20 w-auto object-contain mx-auto mb-3"
             style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}
           />
           <h1

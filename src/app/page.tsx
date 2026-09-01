@@ -72,9 +72,9 @@ export default function Home() {
         <div className="p-3 lg:p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
             <img
-              src="/gvd-logo.webp"
+              src="/guruvayur-logo.png"
               alt="GVD"
-              className="h-10 w-14 object-contain shrink-0"
+              className="h-12 w-auto object-contain shrink-0"
               style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
             />
             <div className="hidden lg:block min-w-0">

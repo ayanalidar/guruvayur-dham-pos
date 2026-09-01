@@ -424,7 +424,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
+        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-6 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
@@ -437,7 +437,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
 
           {/* Customer details — editable when in edit mode, dotted leaders otherwise */}
           {editMode && form ? (
-            <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="inv-customer grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Guest Name"><Input value={form.guestName} onChange={e => setForm({ ...form, guestName: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Guest Phone"><Input value={form.guestPhone} onChange={e => setForm({ ...form, guestPhone: e.target.value })} className="h-7 text-xs" /></Field>
@@ -467,7 +467,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
               <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
             </div>
           ) : (
-            <div className="mt-3 mb-3 space-y-1">
+            <div className="inv-customer">
               <LeaderRow>
                 <LeaderField label="Name" value={invoice.guestName} />
                 <LeaderField label="Mob" value={invoice.guestPhone} width="w-44" />
@@ -486,68 +486,68 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
           )}
 
           {/* Itemized table */}
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif", tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          <table className="inv-table">
             <thead>
-              <tr className="bg-gray-200 border-b border-black">
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '52%' }}>Particulars</th>
-                <th className="text-right py-2 px-2 border-r border-black" style={{ width: '20%' }}>Rate / Day</th>
-                <th className="text-right py-2 px-2" style={{ width: '20%' }}>Amount</th>
+              <tr>
+                <th className="inv-sr">Sr. No</th>
+                <th className="inv-particulars">Particulars</th>
+                <th className="inv-rate" style={{ textAlign: 'right' }}>Rate / Day</th>
+                <th className="inv-amount" style={{ textAlign: 'right' }}>Amount</th>
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-black">
-                <td className="py-2 px-2 border-r border-black text-center">1</td>
-                <td className="py-2 px-2 border-r border-black">
+              <tr>
+                <td className="inv-sr">1</td>
+                <td className="inv-particulars">
                   Room Charges — Room {editMode ? safeForm.roomNumber : invoice.roomNumber} ({editMode ? safeForm.roomType : invoice.roomType})
-                  <span className="block text-[10px] text-muted-foreground mt-0.5">
+                  <span className="inv-subitem">
                     {editMode ? `${form.nights} night(s)` : (
                       <>Check-in: {formatDateShort(invoice.checkInAt)} · Check-out: {formatDateShort(invoice.checkOutAt)} · {invoice.nights} night(s)</>
                     )}
                   </span>
                 </td>
-                <td className="text-right py-2 px-2 border-r border-black font-mono">
+                <td className="inv-rate">
                   {editMode ? formatINR(Number(form.ratePerNight) || 0) : formatINR(invoice.ratePerNight)}
                 </td>
-                <td className="text-right py-2 px-2 font-mono">
+                <td className="inv-amount">
                   {editMode ? formatINR(Number(form.roomCharges) || 0) : formatINR(invoice.roomCharges)}
                 </td>
               </tr>
               {foodOrders.map((fo, idx) => (
-                <tr key={fo.id} className="border-b border-black">
-                  <td className="py-2 px-2 border-r border-black text-center">{idx + 2}</td>
-                  <td className="py-2 px-2 border-r border-black">
+                <tr key={fo.id}>
+                  <td className="inv-sr">{idx + 2}</td>
+                  <td className="inv-particulars">
                     Food Order — {fo.orderNumber}
-                    <span className="text-[10px] text-muted-foreground ml-1">({formatDateShort(fo.createdAt)})</span>
-                    <ul className="mt-0.5 ml-2 text-[10px] text-muted-foreground" style={{ listStyleType: 'none' }}>
+                    <span className="inv-subitem">({formatDateShort(fo.createdAt)})</span>
+                    <ul style={{ listStyleType: 'none', margin: 0, padding: 0 }}>
                       {fo.items.map(it => (
-                        <li key={it.id}>· {it.quantity}× {it.name} — {formatINR(it.total)}</li>
+                        <li key={it.id} className="inv-subitem">· {it.quantity}× {it.name} — {formatINR(it.total)}</li>
                       ))}
                     </ul>
                   </td>
-                  <td className="text-right py-2 px-2 border-r border-black font-mono text-muted-foreground">—</td>
-                  <td className="text-right py-2 px-2 font-mono">{formatINR(fo.grandTotal)}</td>
+                  <td className="inv-rate" style={{ color: '#6B7280' }}>—</td>
+                  <td className="inv-amount">{formatINR(fo.grandTotal)}</td>
                 </tr>
               ))}
               {(editMode ? Number(form.extraCharges) > 0 : invoice.extraCharges > 0) && (
-                <tr className="border-b border-black">
-                  <td className="py-2 px-2 border-r border-black text-center">{foodOrders.length + 2}</td>
-                  <td className="py-2 px-2 border-r border-black">Extra Charges</td>
-                  <td className="text-right py-2 px-2 border-r border-black font-mono text-muted-foreground">—</td>
-                  <td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.extraCharges) || 0 : invoice.extraCharges)}</td>
+                <tr>
+                  <td className="inv-sr">{foodOrders.length + 2}</td>
+                  <td className="inv-particulars">Extra Charges</td>
+                  <td className="inv-rate" style={{ color: '#6B7280' }}>—</td>
+                  <td className="inv-amount">{formatINR(editMode ? Number(form.extraCharges) || 0 : invoice.extraCharges)}</td>
                 </tr>
               )}
               {(editMode ? Number(form.discount) > 0 : invoice.discount > 0) && (
-                <tr className="border-b border-black">
-                  <td className="py-2 px-2 border-r border-black text-center">{foodOrders.length + ((editMode ? Number(form.extraCharges) : invoice.extraCharges) > 0 ? 3 : 2)}</td>
-                  <td className="py-2 px-2 border-r border-black">Discount</td>
-                  <td className="text-right py-2 px-2 border-r border-black font-mono text-muted-foreground">—</td>
-                  <td className="text-right py-2 px-2 font-mono text-emerald-700">- {formatINR(editMode ? Number(form.discount) || 0 : invoice.discount)}</td>
+                <tr>
+                  <td className="inv-sr">{foodOrders.length + ((editMode ? Number(form.extraCharges) : invoice.extraCharges) > 0 ? 3 : 2)}</td>
+                  <td className="inv-particulars">Discount</td>
+                  <td className="inv-rate" style={{ color: '#6B7280' }}>—</td>
+                  <td className="inv-amount inv-discount">- {formatINR(editMode ? Number(form.discount) || 0 : invoice.discount)}</td>
                 </tr>
               )}
-              <tr className="border-t-2 border-black font-bold">
-                <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td>
-                <td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.taxableAmount) || 0 : invoice.taxableAmount)}</td>
+              <tr className="inv-total-row">
+                <td colSpan={3} style={{ textAlign: 'right' }}>Total</td>
+                <td className="inv-amount">{formatINR(editMode ? Number(form.taxableAmount) || 0 : invoice.taxableAmount)}</td>
               </tr>
             </tbody>
           </table>
@@ -767,7 +767,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
+        <div className="flex-1 overflow-y-auto"><div className="invoice-print bg-white p-6 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader
             config={config}
             invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber}
@@ -779,7 +779,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
           />
 
           {editMode && form ? (
-            <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="inv-customer grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Room Number"><Input value={form.roomNumber} onChange={e => setForm({ ...form, roomNumber: e.target.value })} className="h-7 text-xs" /></Field>
@@ -807,7 +807,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
               <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
             </div>
           ) : (
-            <div className="mt-3 mb-3 space-y-1">
+            <div className="inv-customer">
               <LeaderRow>
                 <LeaderField label="Name" value={invoice.customerName} />
                 <LeaderField label="Mob" value="—" width="w-44" />
@@ -826,29 +826,29 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             </div>
           )}
 
-          <table className="w-full text-xs border-collapse border border-black" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif", tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          <table className="inv-table">
             <thead>
-              <tr className="bg-gray-200 border-b border-black">
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '52%' }}>Particulars</th>
-                <th className="text-right py-2 px-2 border-r border-black" style={{ width: '20%' }}>Rate</th>
-                <th className="text-right py-2 px-2" style={{ width: '20%' }}>Amount</th>
+              <tr>
+                <th className="inv-sr">Sr. No</th>
+                <th className="inv-particulars">Particulars</th>
+                <th className="inv-rate" style={{ textAlign: 'right' }}>Rate</th>
+                <th className="inv-amount" style={{ textAlign: 'right' }}>Amount</th>
               </tr>
             </thead>
             <tbody>
               {invoice.order.items.map((it, idx) => (
-                <tr key={it.id} className="border-b border-black">
-                  <td className="py-2 px-2 border-r border-black text-center">{idx + 1}</td>
-                  <td className="py-2 px-2 border-r border-black">{it.name}</td>
-                  <td className="text-right py-2 px-2 border-r border-black font-mono">
+                <tr key={it.id}>
+                  <td className="inv-sr">{idx + 1}</td>
+                  <td className="inv-particulars">{it.name}</td>
+                  <td className="inv-rate">
                     {it.quantity} × {formatINR(it.price)}
                   </td>
-                  <td className="text-right py-2 px-2 font-mono">{formatINR(it.total)}</td>
+                  <td className="inv-amount">{formatINR(it.total)}</td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-black font-bold">
-                <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td>
-                <td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.itemsTotal) || 0 : invoice.itemsTotal)}</td>
+              <tr className="inv-total-row">
+                <td colSpan={3} style={{ textAlign: 'right' }}>Total</td>
+                <td className="inv-amount">{formatINR(editMode ? Number(form.itemsTotal) || 0 : invoice.itemsTotal)}</td>
               </tr>
             </tbody>
           </table>
@@ -919,8 +919,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ----- shared invoice bits -----
 // All styling here matches the client's actual invoice sample (Hotel Guruvayur Dham, Mathura UP)
-// Layout: top GSTIN/title strip → logo + hotel name in red serif → bordered address box →
-// customer grid with dotted leaders → table → tax breakdown → bank + signature footer.
+// Editorial / hospitality-premium design with Playfair Display headings, Inter body, and Roboto Mono for numbers.
+// Color palette: deep burgundy #8B1A1A + warm cream #FBF7F0 + dark ink #1A1A1A + soft gold #C19A4B
 
 function InvoiceHeader({
   config, invoiceNumber, title,
@@ -940,41 +940,28 @@ function InvoiceHeader({
   return (
     <div className="mb-3">
       {/* Top strip: GSTIN | TAX INVOICE | Original/Duplicate */}
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wide pb-1 border-b border-black">
-        <span>{config?.gstNumber ? `GSTIN: ${config.gstNumber}` : ''}</span>
-        <span className="font-bold tracking-widest">TAX INVOICE</span>
-        <span className="text-muted-foreground">{copyNote}</span>
+      <div className="inv-top-strip">
+        <span className="inv-gstin">{config?.gstNumber ? `GSTIN: ${config.gstNumber}` : '\u00A0'}</span>
+        <span className="inv-tax-label">TAX INVOICE</span>
+        <span className="inv-copy">{copyNote}</span>
       </div>
 
       {/* Logo + Hotel name */}
-      <div className="flex items-center gap-3 py-3">
+      <div className="inv-brand-row">
         <img
-          src="/gvd-logo.webp"
+          src="/guruvayur-logo.png"
           alt="GVD"
-          className="h-20 w-28 object-contain shrink-0"
-          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.15))' }}
+          style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.12))' }}
         />
-        <div className="flex-1 text-center">
-          <h1
-            className="text-3xl font-bold leading-none tracking-wide"
-            style={{ color: '#B22222', fontFamily: 'Georgia, "Times New Roman", serif' }}
-          >
-            {config?.name?.toUpperCase() || 'HOTEL GURUVAYUR DHAM'}
-          </h1>
-          {/* Address bar — dark background, white text (like sample) */}
+        <div className="inv-brand-text">
+          <h1>{config?.name?.toUpperCase() || 'HOTEL GURUVAYUR DHAM'}</h1>
           {config?.address && (
-            <div
-              className="mt-2 inline-block px-4 py-1 rounded text-[10px] font-medium text-white"
-              style={{ backgroundColor: '#1F2937' }}
-            >
-              {config.address}
-            </div>
+            <span className="inv-address-bar">{config.address}</span>
           )}
-          {/* Contact strip */}
           {(config?.phone || config?.email) && (
-            <p className="mt-1.5 text-[11px] font-semibold text-gray-800">
+            <p className="inv-contact">
               {config?.phone && `Mob: ${config.phone}`}
-              {config?.phone && config?.email && ' | '}
+              {config?.phone && config?.email && '  |  '}
               {config?.email && `Email: ${config.email}`}
             </p>
           )}
@@ -982,9 +969,9 @@ function InvoiceHeader({
       </div>
 
       {/* Invoice number + title row */}
-      <div className="flex items-end justify-between gap-3 border-t-2 border-black pt-2">
-        <div className="text-left">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Invoice No.</p>
+      <div className="inv-meta-row">
+        <div>
+          <p className="inv-meta-label">Invoice No.</p>
           {editableNumber !== null ? (
             <div className="flex items-center gap-1 no-print">
               <Input
@@ -1006,7 +993,7 @@ function InvoiceHeader({
             </div>
           ) : (
             <div className="flex items-center gap-1 group">
-              <p className="font-mono text-base font-bold">{invoiceNumber}</p>
+              <p className="inv-meta-value">{invoiceNumber}</p>
               {onEditClick && (
                 <Button
                   size="icon"
@@ -1021,12 +1008,12 @@ function InvoiceHeader({
             </div>
           )}
         </div>
-        <div className="text-center">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{title}</p>
+        <div>
+          <p className="inv-meta-title">{title}</p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Date</p>
-          <p className="text-sm font-medium">{formatDateShort(new Date())}</p>
+          <p className="inv-meta-label">Date</p>
+          <p className="inv-meta-value">{formatDateShort(new Date())}</p>
         </div>
       </div>
     </div>
@@ -1036,7 +1023,7 @@ function InvoiceHeader({
 // Dotted leader row for the customer grid (matches sample's "Name....Mob...." style)
 function LeaderRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center text-xs py-0.5" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+    <div className="inv-leader-row">
       {children}
     </div>
   )
@@ -1045,12 +1032,9 @@ function LeaderRow({ children }: { children: React.ReactNode }) {
 function LeaderField({ label, value, width = 'flex-1' }: { label: string; value?: string; width?: string }) {
   return (
     <span className={`${width} inline-flex items-baseline`}>
-      <span className="font-semibold mr-1">{label}:</span>
-      <span
-        className="flex-1 border-b border-dotted border-gray-500 mx-1 leading-tight"
-        style={{ minHeight: '1em' }}
-      >
-        {value && <span className="px-1">{value}</span>}
+      <span className="inv-leader-label">{label}:</span>
+      <span className="inv-leader-line">
+        {value && <span>{value}</span>}
       </span>
     </span>
   )
@@ -1060,26 +1044,24 @@ function InvoiceTotals({ rows }: {
   rows: Array<{ label: string; value: number; bold?: boolean; muted?: boolean; emerald?: boolean; primary?: boolean; doubleTop?: boolean }>
 }) {
   return (
-    <div className="ml-auto w-72 text-xs" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
-      {rows.map((r, i) => (
-        <div
-          key={i}
-          className={`flex items-center justify-between py-0.5 ${r.doubleTop ? 'border-t-2 border-black mt-1 pt-1' : ''} ${r.bold ? 'font-bold' : ''}`}
-        >
-          <span
-            className={`${r.muted ? 'text-muted-foreground' : ''} ${r.emerald ? 'text-emerald-700' : ''} ${r.primary ? 'text-red-800' : ''}`}
-            style={{ flex: 1, borderBottom: r.bold ? '' : '1px dotted #999', marginRight: '6px' }}
-          >
-            {r.label}
-          </span>
-          <span
-            className={`font-mono ${r.primary ? 'text-red-800' : ''} ${r.bold ? 'font-bold' : ''}`}
-            style={{ minWidth: '80px', textAlign: 'right' }}
-          >
-            {r.value < 0 ? '- ' : ''}{formatINR(Math.abs(r.value))}
-          </span>
-        </div>
-      ))}
+    <div className="inv-totals">
+      {rows.map((r, i) => {
+        const cls = [
+          'inv-totals-row',
+          r.primary && r.label === 'G. TOTAL' ? 'grand-total' : '',
+          r.primary && r.label === 'Balance Due' ? 'balance-due' : '',
+        ].filter(Boolean).join(' ')
+        return (
+          <div key={i} className={cls}>
+            <span className="inv-totals-label">
+              {r.label}
+            </span>
+            <span className="inv-totals-value">
+              {r.value < 0 ? '- ' : ''}{formatINR(Math.abs(r.value))}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1094,62 +1076,57 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
   const waUrl = `https://wa.me/?text=${waText}`
 
   return (
-    <div className="mt-6 pt-3 border-t border-gray-300">
+    <div className="inv-footer">
       {/* Bank details + QR code row (only if bank details configured OR review link exists) */}
       {(hasBankDetails || reviewLink) && (
-        <div className="grid grid-cols-[1fr_auto] gap-4 items-start mb-4 pb-3 border-b border-dashed border-gray-300">
+        <div className="inv-bank-row">
           {/* Left: Bank details */}
-          <div className="text-[10px]" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
+          <div>
             {hasBankDetails ? (
               <>
-                <p className="font-bold underline mb-1">Bank Details:</p>
-                {config?.bankName && <p>Name: {config.bankName}</p>}
-                {config?.bankAccount && <p>Account No: <span className="font-mono">{config.bankAccount}</span></p>}
-                {config?.bankIfsc && <p>IFSC: <span className="font-mono">{config.bankIfsc}</span></p>}
-                {config?.bankBranch && <p>Branch: {config.bankBranch}</p>}
+                <p className="inv-bank-title">Bank Details</p>
+                {config?.bankName && <p className="inv-bank-detail"><strong>Name:</strong> {config.bankName}</p>}
+                {config?.bankAccount && <p className="inv-bank-detail"><strong>Account No:</strong> <span style={{ fontFamily: "'Roboto Mono', monospace" }}>{config.bankAccount}</span></p>}
+                {config?.bankIfsc && <p className="inv-bank-detail"><strong>IFSC:</strong> <span style={{ fontFamily: "'Roboto Mono', monospace" }}>{config.bankIfsc}</span></p>}
+                {config?.bankBranch && <p className="inv-bank-detail"><strong>Branch:</strong> {config.bankBranch}</p>}
               </>
             ) : null}
           </div>
           {/* Right: QR code for Google review */}
           {reviewLink && (
-            <div className="text-center no-print">
-              <QrCode value={reviewLink} size={80} alt="Scan to leave a review" />
-              <p className="text-[8px] mt-1 font-semibold text-gray-700">SCAN TO REVIEW</p>
-              <p className="text-[7px] text-muted-foreground">Google Reviews</p>
+            <div className="inv-qr no-print">
+              <QrCode value={reviewLink} size={70} alt="Scan to leave a review" />
+              <p className="inv-qr-caption">SCAN TO REVIEW</p>
+              <p className="inv-qr-sub">Google Reviews</p>
             </div>
           )}
         </div>
       )}
 
       {/* Three-zone footer: Terms | Customer Signature arch | For Hotel Name */}
-      <div className="grid grid-cols-3 gap-4 items-end">
+      <div className="inv-sign-row">
         {/* Left: Terms */}
-        <div className="text-[10px]" style={{ fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
-          <p className="font-bold">E. & O. E.</p>
-          <p className="font-bold mt-1">Terms &amp; Conditions:</p>
-          <p className="text-muted-foreground">1. Subjected to Mathura jurisdiction only.</p>
-          <p className="text-muted-foreground">2. Goods once sold will not be taken back.</p>
-          <p className="text-muted-foreground">3. Interest @ 24% p.a. will be charged if bill not paid within 15 days.</p>
+        <div className="inv-terms">
+          <p className="inv-terms-title">E. &amp; O. E.</p>
+          <p className="inv-terms-title">Terms &amp; Conditions</p>
+          <p className="inv-terms-item">1. Subjected to Mathura jurisdiction only.</p>
+          <p className="inv-terms-item">2. Goods once sold will not be taken back.</p>
+          <p className="inv-terms-item">3. Interest @ 24% p.a. will be charged if bill not paid within 15 days.</p>
         </div>
 
         {/* Center: Customer Signature arch */}
-        <div className="flex flex-col items-center">
-          <div
-            className="w-32 h-12 border-2 border-black border-b-0"
-            style={{ borderRadius: '50% 50% 0 0 / 100% 100% 0 0' }}
-          />
-          <p className="text-[10px] mt-1 font-medium">Customer Signature</p>
+        <div className="inv-sign-arch">
+          <div className="inv-sign-arch-box" />
+          <p className="inv-sign-label">Customer Signature</p>
         </div>
 
         {/* Right: For Hotel Name */}
-        <div className="text-center">
-          <p className="text-[10px] text-muted-foreground">Certified that the particulars given above are true and correct</p>
-          <p className="text-xs mt-3">
-            For: <span className="font-bold" style={{ color: '#B22222', fontFamily: 'Georgia, "Times New Roman", serif' }}>
-              {config?.name?.toUpperCase() || 'GURUVAYUR DHAM'}
-            </span>
+        <div className="inv-hotel-sign">
+          <p className="inv-cert">Certified that the particulars given above are true and correct</p>
+          <p className="inv-for-name">
+            For: {config?.name?.toUpperCase() || 'GURUVAYUR DHAM'}
           </p>
-          <p className="text-[10px] mt-6 text-muted-foreground">Authorised Signatory</p>
+          <p className="inv-auth-sign">Authorised Signatory</p>
         </div>
       </div>
 
@@ -1176,12 +1153,10 @@ function InvoiceFooter({ config }: { config: Config | null; sacCode?: string }) 
       </div>
 
       {/* Footer — matches actual invoice format */}
-      <div className="mt-4 pt-2 border-t text-center text-[10px] text-muted-foreground">
+      <div className="inv-brand-footer">
         <p>This is an auto-generated copy, doesn't require any signature.</p>
-        <p className="mt-1">All disputes are subject to the jurisdiction of Mathura, Uttar Pradesh Only.</p>
-        <p className="mt-2">
-          Powered By: <strong className="font-semibold text-blue-600">GuardianX</strong>
-        </p>
+        <p>All disputes are subject to the jurisdiction of Mathura, Uttar Pradesh Only.</p>
+        <p>Powered By: <span className="inv-guardianx">GuardianX</span></p>
       </div>
     </div>
   )
@@ -1642,12 +1617,12 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-        <div className="invoice-print bg-white p-4 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word', fontFamily: "'Roboto', 'Helvetica Neue', Arial, sans-serif" }}>
+        <div className="invoice-print bg-white p-6 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
           <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" />
 
           {/* Customer details — same format as hotel invoice */}
           {editMode && form ? (
-            <div className="mt-3 mb-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="inv-customer grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Phone"><Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} className="h-7 text-xs" /></Field>
@@ -1671,7 +1646,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
             </div>
           ) : (
-            <div className="mt-3 mb-3 space-y-1">
+            <div className="inv-customer">
               <LeaderRow>
                 <LeaderField label="Name" value={invoice.customerName} />
                 <LeaderField label="Mob" value={invoice.customerPhone || '—'} width="w-44" />
@@ -1699,36 +1674,36 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
           )}
 
           {/* Items table — editable in edit mode */}
-          <table className="w-full text-xs border-collapse border border-black mt-3" style={{ tableLayout: 'fixed', wordWrap: 'break-word' }}>
+          <table className="inv-table">
             <thead>
-              <tr className="bg-gray-200 border-b border-black">
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '8%' }}>Sr. No</th>
-                <th className="text-left py-2 px-2 border-r border-black" style={{ width: '52%' }}>Particulars</th>
-                <th className="text-right py-2 px-2 border-r border-black" style={{ width: '20%' }}>Rate</th>
-                <th className="text-right py-2 px-2" style={{ width: '20%' }}>Amount</th>
+              <tr>
+                <th className="inv-sr">Sr. No</th>
+                <th className="inv-particulars">Particulars</th>
+                <th className="inv-rate" style={{ textAlign: 'right' }}>Rate</th>
+                <th className="inv-amount" style={{ textAlign: 'right' }}>Amount</th>
               </tr>
             </thead>
             <tbody>
               {editMode && form ? (
                 <>
                   {items.map((it: any, idx: number) => (
-                    <tr key={idx} className="border-b border-black">
-                      <td className="py-1 px-2 border-r border-black text-center">{idx + 1}</td>
-                      <td className="py-1 px-2 border-r border-black">
+                    <tr key={idx}>
+                      <td className="inv-sr">{idx + 1}</td>
+                      <td className="inv-particulars">
                         <Input value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-6 text-xs border-0 bg-transparent" />
                       </td>
-                      <td className="py-1 px-2 border-r border-black">
+                      <td className="inv-rate">
                         <div className="flex gap-1">
                           <Input type="number" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-6 text-xs w-12 border-0 bg-transparent" />
                           <span className="text-xs self-center">×</span>
                           <Input type="number" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-6 text-xs w-16 border-0 bg-transparent" />
                         </div>
                       </td>
-                      <td className="text-right py-1 px-2 font-mono">{formatINR((it.quantity || 0) * (it.rate || 0))}</td>
+                      <td className="inv-amount">{formatINR((it.quantity || 0) * (it.rate || 0))}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={4} className="py-1 px-2">
+                    <td colSpan={4} style={{ padding: '4px 8px' }}>
                       <Button size="sm" variant="ghost" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Add Item</Button>
                     </td>
                   </tr>
@@ -1736,24 +1711,24 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               ) : (
                 <>
                   {items.map((it: any, idx: number) => (
-                    <tr key={idx} className="border-b border-black">
-                      <td className="py-2 px-2 border-r border-black text-center">{idx + 1}</td>
-                      <td className="py-2 px-2 border-r border-black">{it.name}</td>
-                      <td className="text-right py-2 px-2 border-r border-black font-mono">{it.quantity} × {formatINR(it.rate)}</td>
-                      <td className="text-right py-2 px-2 font-mono">{formatINR(it.amount || (it.quantity * it.rate))}</td>
+                    <tr key={idx}>
+                      <td className="inv-sr">{idx + 1}</td>
+                      <td className="inv-particulars">{it.name}</td>
+                      <td className="inv-rate">{it.quantity} × {formatINR(it.rate)}</td>
+                      <td className="inv-amount">{formatINR(it.amount || (it.quantity * it.rate))}</td>
                     </tr>
                   ))}
                 </>
               )}
               {(editMode ? Number(form.discount) : invoice.discount) > 0 && (
-                <tr className="border-b border-black">
-                  <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Discount</td>
-                  <td className="text-right py-2 px-2 font-mono text-emerald-700">- {formatINR(editMode ? Number(form.discount) : invoice.discount)}</td>
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'right' }}>Discount</td>
+                  <td className="inv-amount inv-discount">- {formatINR(editMode ? Number(form.discount) : invoice.discount)}</td>
                 </tr>
               )}
-              <tr className="border-t-2 border-black font-bold">
-                <td colSpan={3} className="py-2 px-2 text-right border-r border-black">Total</td>
-                <td className="text-right py-2 px-2 font-mono">{formatINR(editMode ? Number(form.itemsTotal) - Number(form.discount) : invoice.itemsTotal - invoice.discount)}</td>
+              <tr className="inv-total-row">
+                <td colSpan={3} style={{ textAlign: 'right' }}>Total</td>
+                <td className="inv-amount">{formatINR(editMode ? Number(form.itemsTotal) - Number(form.discount) : invoice.itemsTotal - invoice.discount)}</td>
               </tr>
             </tbody>
           </table>

@@ -38,7 +38,7 @@ export default async function PublicMenuPage({ params }: { params: Promise<{ roo
         <div className="max-w-2xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <img src="/gvd-logo.webp" alt="GVD" className="h-10 w-14 object-contain" />
+              <img src="/guruvayur-logo.png" alt="GVD" className="h-12 w-auto object-contain" />
               <div>
                 <h1 className="text-lg font-bold leading-tight" style={{ color: '#B22222', fontFamily: 'Georgia, serif' }}>
                   {hotelName.toUpperCase()}
