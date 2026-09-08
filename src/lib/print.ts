@@ -594,19 +594,24 @@ function waitForIframeReady(doc: Document): Promise<void> {
   return Promise.all([imagesLoaded, fontsLoaded, layoutReady]).then(() => undefined)
 }
 
-// Create a hidden iframe with the invoice HTML loaded into it
+// Create an off-screen iframe with the invoice HTML loaded into it.
+// The iframe MUST have real dimensions (not 0×0) — many browsers refuse to
+// print an iframe with zero size and fall back to printing the parent window.
+// We position it off-screen (left: -9999px) so it's invisible but printable.
 function createInvoiceIframe(clone: HTMLElement, suggestedFilename: string): HTMLIFrameElement {
   const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
     .map(node => node.outerHTML)
     .join('\n')
 
   const iframe = document.createElement('iframe')
+  // Off-screen but visible to the browser's print engine
   iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
+  iframe.style.left = '-9999px'
+  iframe.style.top = '0'
+  iframe.style.width = '210mm'
+  iframe.style.height = '297mm'
   iframe.style.border = '0'
+  iframe.style.background = 'white'
   document.body.appendChild(iframe)
 
   const doc = iframe.contentWindow?.document
@@ -750,11 +755,8 @@ export function previewInvoice(filenameOpts?: {
   `
   printBtn.onmouseover = () => { printBtn.style.background = '#6B0F1A' }
   printBtn.onmouseout = () => { printBtn.style.background = '#8B1A1A' }
-  printBtn.onclick = () => {
-    closePreview()
-    // Small delay to let the preview close before opening print dialog
-    setTimeout(() => printInvoice(filenameOpts), 100)
-  }
+  // printBtn.onclick is set later, after the preview iframe is created,
+  // so it can print directly from the preview iframe.
 
   const closeBtn = document.createElement('button')
   closeBtn.textContent = '✕ Close'
@@ -808,10 +810,39 @@ export function previewInvoice(filenameOpts?: {
     .map(node => node.outerHTML)
     .join('\n')
   const pdoc = previewIframe.contentWindow?.document
+  const pwin = previewIframe.contentWindow
   if (pdoc) {
     pdoc.open()
     pdoc.write(buildInvoiceHtml(clone, suggestedFilename, styles))
     pdoc.close()
+  }
+
+  // Update the print button to print DIRECTLY from the preview iframe.
+  // This is the key fix: we print from the preview iframe (which is visible
+  // and has real dimensions) instead of closing the preview and creating
+  // a second hidden 0×0 iframe that browsers refuse to print.
+  printBtn.onclick = () => {
+    if (!pdoc || !pwin) {
+      // Fallback: close preview and use the off-screen iframe approach
+      closePreview()
+      setTimeout(() => printInvoice(filenameOpts), 100)
+      return
+    }
+    // Wait for fonts + images to load in the preview iframe, then print
+    waitForIframeReady(pdoc).then(() => {
+      try {
+        // Set the document title — browsers use this as the default
+        // "Save as PDF" filename in the print dialog.
+        pdoc.title = suggestedFilename.replace(/\.pdf$/i, '')
+        pwin.focus()
+        pwin.print()
+      } catch (e) {
+        console.error('Print from preview failed:', e)
+        // Fallback: close preview and use the off-screen iframe approach
+        closePreview()
+        setTimeout(() => printInvoice(filenameOpts), 100)
+      }
+    })
   }
 
   // Close preview on Escape
