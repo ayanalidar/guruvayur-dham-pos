@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     customerName, customerPhone, customerAddress, customerGstIn,
+    roomType,
     checkInDate, checkOutDate,
     items, discount, cgstRate, sgstRate, igstRate,
     paymentMethod, notes, customInvoiceNumber,
@@ -81,6 +82,7 @@ export async function POST(req: NextRequest) {
       customerPhone: customerPhone ? String(customerPhone).trim().slice(0, 20) : null,
       customerAddress: customerAddress ? String(customerAddress).trim().slice(0, 500) : null,
       customerGstIn: customerGstIn ? String(customerGstIn).trim().slice(0, 20) : null,
+      roomType: roomType ? String(roomType).trim().slice(0, 50) : null,
       checkInDate: checkInDate ? new Date(checkInDate) : null,
       checkOutDate: checkOutDate ? new Date(checkOutDate) : null,
       items: safeItems,

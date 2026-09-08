@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const data: Record<string, unknown> = {}
 
   // String fields
-  const strFields = ['invoiceNumber', 'customerName', 'customerPhone', 'customerAddress', 'customerGstIn', 'paymentMethod', 'notes']
+  const strFields = ['invoiceNumber', 'customerName', 'customerPhone', 'customerAddress', 'customerGstIn', 'roomType', 'paymentMethod', 'notes']
   for (const k of strFields) {
     if (body[k] != null) {
       if (k === 'invoiceNumber') {
@@ -25,6 +25,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const exists = await db.customInvoice.findFirst({ where: { invoiceNumber: num, NOT: { id } } })
         if (exists) return NextResponse.json({ error: 'Invoice number already exists' }, { status: 400 })
         data.invoiceNumber = num
+      } else if (k === 'roomType') {
+        // Allow setting roomType to empty string (clearing it)
+        data.roomType = String(body[k]).trim() || null
       } else {
         data[k] = String(body[k])
       }

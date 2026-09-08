@@ -63,12 +63,12 @@ export async function downloadCustomInvoices() {
   const res = await fetch('/api/invoices/custom')
   const data = await res.json()
   downloadCSV('custom-invoices.csv', [
-    'Invoice No', 'Date', 'Customer Name', 'GSTIN', 'Phone',
+    'Invoice No', 'Date', 'Customer Name', 'GSTIN', 'Phone', 'Room Type',
     'Items Total', 'Discount', 'CGST Amount', 'SGST Amount', 'IGST Amount',
     'Grand Total', 'Payment Method', 'Notes'
   ], data.invoices.map((inv: any) => [
     inv.invoiceNumber, formatDateShort(inv.createdAt), inv.customerName,
-    inv.customerGstIn || '', inv.customerPhone || '',
+    inv.customerGstIn || '', inv.customerPhone || '', inv.roomType || '',
     inv.itemsTotal, inv.discount, inv.cgstAmount, inv.sgstAmount, inv.igstAmount,
     inv.grandTotal, inv.paymentMethod || '', inv.notes || ''
   ]))

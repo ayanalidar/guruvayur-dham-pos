@@ -1175,12 +1175,33 @@ function WhatsAppIcon({ className = '' }: { className?: string }) {
 type CustomInvoice = {
   id: string; invoiceNumber: string; customerName: string; customerPhone: string | null
   customerAddress: string | null; customerGstIn: string | null
+  roomType: string | null
   checkInDate: string | null; checkOutDate: string | null
   items: any[]; itemsTotal: number
   cgstRate: number; sgstRate: number; igstRate?: number
   cgstAmount: number; sgstAmount: number; igstAmount?: number
   grandTotal: number; discount: number; paymentMethod: string | null; notes: string | null
   createdAt: string
+}
+
+// Room type options for custom invoices
+const ROOM_TYPES = ['Single Bed', 'Double Bed', 'Twin Bed', 'Deluxe Room', 'Family Room', 'Suite'] as const
+
+// Default rate per night for each room type (used when auto-adding a room line)
+const DEFAULT_ROOM_RATES: Record<string, number> = {
+  'Single Bed': 999,
+  'Double Bed': 1499,
+  'Twin Bed': 1799,
+  'Deluxe Room': 2499,
+  'Family Room': 2999,
+  'Suite': 4999,
+}
+
+// Tag prefix used to mark auto-generated room line items so we can find/update them later
+const ROOM_LINE_TAG = '__room_line__'
+
+function isRoomLine(it: any) {
+  return it && typeof it === 'object' && (it as any).__roomLine === true
 }
 
 function CustomInvoicesTab() {
@@ -1256,6 +1277,7 @@ function CustomInvoicesTab() {
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm font-semibold">#{inv.invoiceNumber}</span>
                   <Badge variant="outline" className="text-xs">Custom</Badge>
+                  {inv.roomType && <Badge variant="secondary" className="text-xs">{inv.roomType}</Badge>}
                 </div>
                 <p className="text-sm mt-0.5 truncate">{inv.customerName} · {inv.items?.length || 0} item(s)</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{formatDateShort(inv.createdAt)}</p>
@@ -1286,10 +1308,11 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '',
+    roomType: '',
     customInvoiceNumber: '', checkInDate: '', checkOutDate: '',
     cgstRate: 0, sgstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '',
   })
-  const [items, setItems] = useState<{ name: string; quantity: number; rate: number }[]>([
+  const [items, setItems] = useState<{ name: string; quantity: number; rate: number; __roomLine?: boolean }[]>([
     { name: '', quantity: 1, rate: 0 },
   ])
 
@@ -1299,7 +1322,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         setConfig(d.config)
         setForm(f => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9, igstRate: d.config?.igstRate ?? 0 }))
       }).catch(() => {})
-      setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
+      setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', roomType: '', customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
       setItems([{ name: '', quantity: 1, rate: 0 }])
     }
   }, [open])
@@ -1309,13 +1332,59 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
     ? Math.max(1, Math.ceil((new Date((form as any).checkOutDate).getTime() - new Date((form as any).checkInDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0
 
-  // When nights > 0, auto-update the first item's quantity to match nights
-  // This ensures room charges = rate × nights
+  // Auto-line behaviour for Room Type:
+  // - When roomType is selected AND check-in/out dates are present, automatically add (or update) a room-line item tagged with __roomLine=true.
+  // - The line's quantity = nights, rate = existing rate if already set, otherwise default for the room type.
+  // - If roomType is cleared, remove the auto room-line.
+  // - If dates change, update the room-line's quantity.
   useEffect(() => {
-    if (nights > 0 && items.length > 0 && items[0].quantity !== nights) {
-      setItems(prev => prev.map((it, i) => i === 0 ? { ...it, quantity: nights } : it))
-    }
-  }, [nights])
+    setItems(prev => {
+      const hasRoomType = !!(form as any).roomType
+      const hasDates = nights > 0
+      const existingRoomLineIdx = prev.findIndex(it => (it as any).__roomLine === true)
+
+      // Case 1: No room type — remove any existing room line
+      if (!hasRoomType) {
+        if (existingRoomLineIdx === -1) return prev
+        const next = prev.filter((_, i) => i !== existingRoomLineIdx)
+        // Don't leave the items list empty
+        if (next.length === 0) next.push({ name: '', quantity: 1, rate: 0 })
+        return next
+      }
+
+      // Case 2: Room type selected but no dates yet — don't auto-add (user can still add manually)
+      if (!hasDates) {
+        // If a room-line exists from before (e.g., user cleared dates), keep it but reset qty to 1
+        if (existingRoomLineIdx !== -1) {
+          const next = [...prev]
+          next[existingRoomLineIdx] = { ...next[existingRoomLineIdx], quantity: 1 }
+          return next
+        }
+        return prev
+      }
+
+      // Case 3: Room type + dates — add or update the room line
+      const roomName = `${(form as any).roomType} — Room Charges`
+      const defaultRate = DEFAULT_ROOM_RATES[(form as any).roomType] ?? 0
+      if (existingRoomLineIdx === -1) {
+        // Insert as first item, keep existing items below
+        const roomLine = { name: roomName, quantity: nights, rate: defaultRate, __roomLine: true }
+        return [roomLine, ...prev]
+      } else {
+        // Update existing room line: keep user-edited rate, but always sync name + quantity
+        const next = [...prev]
+        const cur = next[existingRoomLineIdx]
+        next[existingRoomLineIdx] = {
+          ...cur,
+          name: roomName,
+          quantity: nights,
+          // Keep existing rate if user has set it; otherwise update to default for new room type
+          rate: cur.rate > 0 ? cur.rate : defaultRate,
+        }
+        return next
+      }
+    })
+  }, [(form as any).roomType, nights])
 
   const itemsTotal = items.reduce((s, it) => s + (it.rate * it.quantity), 0)
   const taxable = Math.max(0, itemsTotal - (Number(form.discount) || 0))
@@ -1329,11 +1398,20 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: field === 'name' ? value : Number(value) || 0 } : it))
   }
   function addItem() { setItems(prev => [...prev, { name: '', quantity: 1, rate: 0 }]) }
-  function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)) }
+  function removeItem(idx: number) {
+    setItems(prev => {
+      const next = prev.filter((_, i) => i !== idx)
+      if (next.length === 0) next.push({ name: '', quantity: 1, rate: 0 })
+      return next
+    })
+  }
 
   async function submit() {
     if (!form.customerName.trim()) { toast({ title: 'Customer name is required', variant: 'destructive' }); return }
-    const validItems = items.filter(it => it.name.trim() && it.rate > 0)
+    // Strip the __roomLine flag from items before sending — server only stores name/quantity/rate/amount
+    const validItems = items
+      .filter(it => it.name.trim() && it.rate > 0)
+      .map(it => ({ name: it.name, quantity: it.quantity, rate: it.rate }))
     if (validItems.length === 0) { toast({ title: 'Add at least one item with a name and price', variant: 'destructive' }); return }
 
     setSubmitting(true)
@@ -1342,6 +1420,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         method: 'POST',
         body: JSON.stringify({
           ...form,
+          roomType: (form as any).roomType || undefined,
           items: validItems,
         }),
       })
@@ -1384,20 +1463,39 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
           <Field label="Address (optional)">
             <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Check-in Date (optional)">
-              <Input type="date" value={(form as any).checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value } as any)} />
+
+          {/* Room Type + Check-in/out + Nights row */}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Room Type (optional)">
+              <select
+                value={(form as any).roomType || ''}
+                onChange={e => setForm({ ...form, roomType: e.target.value } as any)}
+                className="h-8 text-xs w-full border rounded px-2"
+              >
+                <option value="">— No room —</option>
+                {ROOM_TYPES.map(rt => <option key={rt} value={rt}>{rt}</option>)}
+              </select>
             </Field>
-            <Field label="Check-out Date (optional)">
-              <Input type="date" value={(form as any).checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value } as any)} />
-            </Field>
-            <Field label="Nights (auto)">
-              <Input type="number" value={nights || ''} readOnly className="bg-muted/50" placeholder="—" />
+            <Field label="Nights (auto from dates)">
+              <Input type="number" value={nights || ''} readOnly className="bg-muted/50 h-8 text-xs" placeholder="—" />
             </Field>
           </div>
-          {nights > 0 && (
-            <p className="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2">
-              ✓ {nights} night(s) detected — first item quantity auto-set to {nights}. Rate × {nights} nights = total room charges.
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Check-in Date">
+              <Input type="date" value={(form as any).checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value } as any)} className="h-8 text-xs" />
+            </Field>
+            <Field label="Check-out Date">
+              <Input type="date" value={(form as any).checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value } as any)} className="h-8 text-xs" />
+            </Field>
+          </div>
+          {(form as any).roomType && nights > 0 && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2">
+              ✓ Room line auto-added: <strong>{(form as any).roomType}</strong> × {nights} night(s) at {formatINR(items.find(it => (it as any).__roomLine)?.rate ?? DEFAULT_ROOM_RATES[(form as any).roomType] ?? 0)}/night. Edit the rate above if needed.
+            </p>
+          )}
+          {(form as any).roomType && nights === 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              ⚠ Room type selected but no dates set. Add check-in & check-out dates to auto-calculate room charges.
             </p>
           )}
 
@@ -1409,7 +1507,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
             </div>
             <div className="space-y-2">
               {items.map((it, idx) => (
-                <div key={idx} className="grid grid-cols-[1fr_70px_90px_32px] gap-2 items-center">
+                <div key={idx} className={`grid grid-cols-[1fr_70px_90px_32px] gap-2 items-center ${it.__roomLine ? 'bg-emerald-50/60 border border-emerald-200 rounded p-1' : ''}`}>
                   <Input placeholder="Item name / description" value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-8 text-xs" />
                   <Input type="number" min={1} placeholder="Qty" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-8 text-xs" />
                   <Input type="number" min={0} placeholder="Rate" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-8 text-xs" />
@@ -1504,6 +1602,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
         customerPhone: invoice.customerPhone || '',
         customerAddress: invoice.customerAddress || '',
         customerGstIn: invoice.customerGstIn || '',
+        roomType: invoice.roomType || '',
         checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 10) : '',
         checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 10) : '',
         items: invoice.items || [],
@@ -1527,7 +1626,8 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
   const safeForm = form || {
     invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName,
     customerPhone: invoice.customerPhone || '', customerAddress: invoice.customerAddress || '',
-    customerGstIn: invoice.customerGstIn || '', checkInDate: invoice.checkInDate || '',
+    customerGstIn: invoice.customerGstIn || '', roomType: invoice.roomType || '',
+    checkInDate: invoice.checkInDate || '',
     checkOutDate: invoice.checkOutDate || '', items: invoice.items || [],
     itemsTotal: invoice.itemsTotal, cgstRate: invoice.cgstRate, sgstRate: invoice.sgstRate,
     igstRate: invoice.igstRate || 0, cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount,
@@ -1541,6 +1641,58 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
   const ciDate = editMode ? safeForm.checkInDate : invoice.checkInDate
   const coDate = editMode ? safeForm.checkOutDate : invoice.checkOutDate
   const nights = (ciDate && coDate) ? Math.max(1, Math.ceil((new Date(coDate).getTime() - new Date(ciDate).getTime()) / (1000 * 60 * 60 * 24))) : 0
+
+  // Auto-line behavior for room type (only in edit mode)
+  // - Tagged with __roomLine so we can find/update it
+  // - Auto-adds when roomType + dates are both set
+  // - Auto-updates quantity when dates change
+  // - Auto-removes when roomType is cleared
+  useEffect(() => {
+    if (!editMode || !form) return
+    const roomType = form.roomType
+    const hasRoomType = !!roomType
+    const hasDates = nights > 0
+    const existingRoomLineIdx = (form.items || []).findIndex((it: any) => it.__roomLine === true)
+
+    setForm((prev: any) => {
+      if (!prev) return prev
+      const curItems = [...(prev.items || [])]
+
+      // Case 1: No room type — remove room line if any
+      if (!hasRoomType) {
+        if (existingRoomLineIdx === -1) return prev
+        const next = curItems.filter((_, i) => i !== existingRoomLineIdx)
+        if (next.length === 0) next.push({ name: '', quantity: 1, rate: 0 })
+        return recompute({ ...prev, items: next })
+      }
+
+      // Case 2: Room type set but no dates — keep room line (if exists) with qty=1
+      if (!hasDates) {
+        if (existingRoomLineIdx === -1) return prev
+        const next = [...curItems]
+        next[existingRoomLineIdx] = { ...next[existingRoomLineIdx], quantity: 1 }
+        return recompute({ ...prev, items: next })
+      }
+
+      // Case 3: Room type + dates — add or update room line
+      const roomName = `${roomType} — Room Charges`
+      const defaultRate = DEFAULT_ROOM_RATES[roomType] ?? 0
+      if (existingRoomLineIdx === -1) {
+        const roomLine = { name: roomName, quantity: nights, rate: defaultRate, __roomLine: true }
+        return recompute({ ...prev, items: [roomLine, ...curItems] })
+      } else {
+        const next = [...curItems]
+        const cur = next[existingRoomLineIdx]
+        next[existingRoomLineIdx] = {
+          ...cur,
+          name: roomName,
+          quantity: nights,
+          rate: cur.rate > 0 ? cur.rate : defaultRate,
+        }
+        return recompute({ ...prev, items: next })
+      }
+    })
+  }, [editMode, form?.roomType, nights])
 
   function recompute(f: any) {
     const itemsTotal = (f.items || []).reduce((s: number, it: any) => s + (it.rate * it.quantity), 0)
@@ -1559,9 +1711,17 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
     if (!invoice || !form) return
     setSaving(true)
     try {
+      // Strip the __roomLine flag from items before sending — server only stores name/quantity/rate/amount
+      const cleanItems = (form.items || []).map((it: any) => ({
+        name: it.name,
+        quantity: Number(it.quantity) || 0,
+        rate: Number(it.rate) || 0,
+        amount: (Number(it.quantity) || 0) * (Number(it.rate) || 0),
+      }))
+      const payload = { ...form, items: cleanItems }
       const r = await apiFetch<{ invoice: CustomInvoice }>(`/api/invoices/custom/${invoice.id}`, {
         method: 'PATCH',
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       Object.assign(invoice, r.invoice)
       setEditMode(false)
@@ -1628,6 +1788,18 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               <Field label="Phone"><Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="GSTIN"><Input value={form.customerGstIn} onChange={e => setForm({ ...form, customerGstIn: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Address"><Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Room Type">
+                <select value={form.roomType || ''} onChange={e => setForm({ ...form, roomType: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
+                  <option value="">— No room —</option>
+                  {ROOM_TYPES.map(rt => <option key={rt} value={rt}>{rt}</option>)}
+                </select>
+              </Field>
+              <Field label="Check-in Date"><Input type="date" value={form.checkInDate} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Check-out Date"><Input type="date" value={form.checkOutDate} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Discount (₹)"><Input type="number" value={form.discount} onChange={e => setForm(recompute({ ...form, discount: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="CGST %"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="SGST %"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
+              <Field label="IGST %"><Input type="number" step="0.1" value={form.igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value) }))} className="h-7 text-xs" placeholder="0" /></Field>
               <Field label="Payment Method">
                 <select value={form.paymentMethod} onChange={e => setForm({ ...form, paymentMethod: e.target.value })} className="h-7 text-xs w-full border rounded px-1">
                   <option value="">—</option>
@@ -1637,12 +1809,6 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                   <option value="Mixed">Mixed</option>
                 </select>
               </Field>
-              <Field label="Check-in Date"><Input type="date" value={form.checkInDate} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-7 text-xs" /></Field>
-              <Field label="Check-out Date"><Input type="date" value={form.checkOutDate} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-7 text-xs" /></Field>
-              <Field label="Discount (₹)"><Input type="number" value={form.discount} onChange={e => setForm(recompute({ ...form, discount: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-              <Field label="CGST %"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-              <Field label="SGST %"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
-              <Field label="IGST %"><Input type="number" step="0.1" value={form.igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value) }))} className="h-7 text-xs" placeholder="0" /></Field>
               <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
             </div>
           ) : (
@@ -1651,23 +1817,27 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                 <LeaderField label="Name" value={invoice.customerName} />
                 <LeaderField label="Mob" value={invoice.customerPhone || '—'} width="w-44" />
               </LeaderRow>
-              {invoice.customerGstIn && (
+              {invoice.customerGstIn ? (
                 <LeaderRow>
                   <LeaderField label="GSTIN" value={invoice.customerGstIn} />
                   <LeaderField label="Address" value={invoice.customerAddress || '—'} width="w-48" />
                 </LeaderRow>
-              )}
-              {!invoice.customerGstIn && (
+              ) : (
                 <LeaderRow>
                   <LeaderField label="Address" value={invoice.customerAddress || '—'} />
                   <LeaderField label="Date" value={formatDateShort(invoice.createdAt)} width="w-48" />
                 </LeaderRow>
               )}
-              {ciDate && coDate && (
+              {(invoice.roomType || (ciDate && coDate)) && (
                 <LeaderRow>
-                  <LeaderField label="A/D Date" value={formatDateShort(ciDate)} width="w-40" />
-                  <LeaderField label="D/I Date" value={formatDateShort(coDate)} width="w-40" />
-                  {nights > 0 && <LeaderField label="Nights" value={String(nights)} width="w-24" />}
+                  {invoice.roomType && <LeaderField label="Room" value={invoice.roomType} width="w-44" />}
+                  {ciDate && coDate && (
+                    <>
+                      <LeaderField label="A/D Date" value={formatDateShort(ciDate)} width="w-40" />
+                      <LeaderField label="D/I Date" value={formatDateShort(coDate)} width="w-40" />
+                      {nights > 0 && <LeaderField label="Nights" value={String(nights)} width="w-24" />}
+                    </>
+                  )}
                 </LeaderRow>
               )}
             </div>

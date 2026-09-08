@@ -201,6 +201,7 @@ model CustomInvoice {
   customerPhone   String?
   customerAddress String?
   customerGstIn   String?
+  roomType        String?  // Single Bed / Double Bed / Twin Bed / Deluxe / Family Room / Suite
   checkInDate     DateTime?
   checkOutDate    DateTime?
   items           Json     // [{ name, quantity, rate, amount }]
