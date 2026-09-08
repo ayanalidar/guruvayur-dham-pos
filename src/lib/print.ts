@@ -1,60 +1,24 @@
 'use client'
 
-// Print invoice using a hidden iframe.
-// Injects a professional A4 print stylesheet with Google Fonts (Playfair Display, Inter, Roboto Mono).
-// Waits for fonts + images to load before triggering print to avoid blank/broken output.
-export function printInvoice() {
-  const el = document.querySelector('.invoice-print') as HTMLElement
-  if (!el) {
-    window.print()
-    return
-  }
+// ===== Invoice Print + Preview + Auto-Save PDF =====
+//
+// This module provides two functions:
+//   1. previewInvoice() — opens a full-screen preview dialog showing exactly
+//      what will be printed. User clicks "Print" inside the preview to actually
+//      open the browser's print dialog.
+//   2. printInvoice() — directly opens the browser's print dialog (no preview).
+//
+// Both functions:
+//   - Clone the .invoice-print element from the page
+//   - Inject professional A4 print CSS + Google Fonts into a hidden iframe
+//   - Wait for fonts + images to load before printing
+//   - Set the iframe document's <title> to a suggested filename so the browser's
+//     "Save as PDF" dialog defaults to that name.
+//
+// Suggested filename format: "Invoice_<number>_<customerName>_<roomTypes>.pdf"
+// e.g. "Invoice_176_ABHISHEK_SuperiorRoom.pdf"
 
-  // Clone the invoice, remove .no-print elements
-  const clone = el.cloneNode(true) as HTMLElement
-  clone.querySelectorAll('.no-print').forEach(e => e.remove())
-
-  // Copy all stylesheets from the parent document
-  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-    .map(node => node.outerHTML)
-    .join('\n')
-
-  // Create hidden iframe
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
-  iframe.style.border = '0'
-  document.body.appendChild(iframe)
-
-  const doc = iframe.contentWindow?.document
-  if (!doc) {
-    document.body.removeChild(iframe)
-    window.print()
-    return
-  }
-
-  doc.open()
-  doc.write(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Invoice</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  ${styles}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    /* ===== Professional A4 Invoice Print Stylesheet =====
-       Design language: editorial / hospitality-premium
-       Palette: deep burgundy #8B1A1A + warm cream #FBF7F0 + dark ink #1A1A1A + soft gold #C19A4B
-       Typography: Playfair Display (headings) + Inter (body) + Roboto Mono (numbers)
-       Page: A4 portrait (210mm x 297mm) with 8mm margins
-    */
-
+const PRINT_STYLES = `
     :root {
       --gvd-burgundy: #8B1A1A;
       --gvd-burgundy-deep: #6B0F1A;
@@ -65,18 +29,12 @@ export function printInvoice() {
       --gvd-border: #D4D4D8;
     }
 
-    @page {
-      size: A4 portrait;
-      margin: 8mm;
-    }
+    @page { size: A4 portrait; margin: 8mm; }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     html, body {
-      margin: 0;
-      padding: 0;
+      margin: 0; padding: 0;
       background: white;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -90,7 +48,6 @@ export function printInvoice() {
       color: var(--gvd-ink);
     }
 
-    /* A4 page container — fills printable area */
     .invoice-print {
       max-width: 194mm !important;
       width: 194mm !important;
@@ -106,7 +63,6 @@ export function printInvoice() {
       overflow: visible !important;
     }
 
-    /* ===================== HEADER ===================== */
     .invoice-print .inv-top-strip {
       display: flex !important;
       justify-content: space-between !important;
@@ -118,7 +74,6 @@ export function printInvoice() {
       text-transform: uppercase !important;
       color: var(--gvd-gray) !important;
     }
-
     .invoice-print .inv-top-strip .inv-gstin {
       font-family: 'Roboto Mono', monospace !important;
       font-weight: 500 !important;
@@ -145,22 +100,18 @@ export function printInvoice() {
       padding: 14px 0 !important;
       border-bottom: 2px solid var(--gvd-burgundy) !important;
     }
-
     .invoice-print .inv-brand-row img {
       max-height: 70px !important;
       max-width: 180px !important;
       width: auto !important;
       height: 70px !important;
       object-fit: contain !important;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important;
     }
-
     .invoice-print .inv-brand-text {
       flex: 1 !important;
       text-align: center !important;
       padding: 0 6px !important;
     }
-
     .invoice-print .inv-brand-text h1 {
       font-family: 'Playfair Display', Georgia, serif !important;
       font-weight: 700 !important;
@@ -171,7 +122,6 @@ export function printInvoice() {
       margin: 0 0 4px 0 !important;
       text-transform: uppercase !important;
     }
-
     .invoice-print .inv-brand-text .inv-address-bar {
       display: inline-block !important;
       padding: 4px 14px !important;
@@ -182,7 +132,6 @@ export function printInvoice() {
       border-radius: 2px !important;
       margin-top: 4px !important;
     }
-
     .invoice-print .inv-brand-text .inv-contact {
       margin-top: 6px !important;
       font-size: 9pt !important;
@@ -190,7 +139,6 @@ export function printInvoice() {
       font-weight: 500 !important;
     }
 
-    /* Invoice meta row (invoice no + date) */
     .invoice-print .inv-meta-row {
       display: flex !important;
       justify-content: space-between !important;
@@ -198,7 +146,6 @@ export function printInvoice() {
       padding: 10px 0 !important;
       border-bottom: 1px solid var(--gvd-border) !important;
     }
-
     .invoice-print .inv-meta-row .inv-meta-label {
       font-size: 7.5pt !important;
       text-transform: uppercase !important;
@@ -207,14 +154,12 @@ export function printInvoice() {
       font-weight: 500 !important;
       margin-bottom: 2px !important;
     }
-
     .invoice-print .inv-meta-row .inv-meta-value {
       font-family: 'Roboto Mono', monospace !important;
       font-size: 11pt !important;
       font-weight: 600 !important;
       color: var(--gvd-ink) !important;
     }
-
     .invoice-print .inv-meta-row .inv-meta-title {
       font-family: 'Playfair Display', Georgia, serif !important;
       font-size: 13pt !important;
@@ -225,12 +170,10 @@ export function printInvoice() {
       text-align: center !important;
     }
 
-    /* ===================== CUSTOMER DETAILS ===================== */
     .invoice-print .inv-customer {
       padding: 10px 0 !important;
       border-bottom: 1px solid var(--gvd-border) !important;
     }
-
     .invoice-print .inv-customer .inv-leader-row {
       display: flex !important;
       align-items: baseline !important;
@@ -238,14 +181,12 @@ export function printInvoice() {
       padding: 2px 0 !important;
       font-size: 10pt !important;
     }
-
     .invoice-print .inv-customer .inv-leader-label {
       font-weight: 600 !important;
       color: var(--gvd-ink) !important;
       font-size: 9.5pt !important;
       min-width: 70px !important;
     }
-
     .invoice-print .inv-customer .inv-leader-line {
       flex: 1 !important;
       border-bottom: 1px dotted #999 !important;
@@ -255,7 +196,6 @@ export function printInvoice() {
       font-weight: 500 !important;
     }
 
-    /* ===================== TABLE ===================== */
     .invoice-print table.inv-table {
       width: 100% !important;
       border-collapse: collapse !important;
@@ -263,12 +203,10 @@ export function printInvoice() {
       font-size: 10pt !important;
       font-family: 'Inter', Arial, sans-serif !important;
     }
-
     .invoice-print table.inv-table thead tr {
       background: var(--gvd-burgundy) !important;
       color: white !important;
     }
-
     .invoice-print table.inv-table thead th {
       padding: 7px 8px !important;
       font-size: 8.5pt !important;
@@ -278,21 +216,13 @@ export function printInvoice() {
       border-right: 1px solid rgba(255,255,255,0.2) !important;
       text-align: left !important;
     }
-
-    .invoice-print table.inv-table thead th:last-child {
-      border-right: none !important;
-    }
-
+    .invoice-print table.inv-table thead th:last-child { border-right: none !important; }
     .invoice-print table.inv-table tbody td {
       padding: 6px 8px !important;
       border-bottom: 1px solid #E5E5E5 !important;
       vertical-align: top !important;
     }
-
-    .invoice-print table.inv-table tbody tr:nth-child(even) td {
-      background: #FAFAF8 !important;
-    }
-
+    .invoice-print table.inv-table tbody tr:nth-child(even) td { background: #FAFAF8 !important; }
     .invoice-print table.inv-table .inv-sr {
       text-align: center !important;
       font-family: 'Roboto Mono', monospace !important;
@@ -300,11 +230,7 @@ export function printInvoice() {
       color: var(--gvd-gray) !important;
       width: 8% !important;
     }
-
-    .invoice-print table.inv-table .inv-particulars {
-      width: 52% !important;
-    }
-
+    .invoice-print table.inv-table .inv-particulars { width: 52% !important; }
     .invoice-print table.inv-table .inv-rate,
     .invoice-print table.inv-table .inv-amount {
       text-align: right !important;
@@ -312,7 +238,6 @@ export function printInvoice() {
       font-weight: 500 !important;
       width: 20% !important;
     }
-
     .invoice-print table.inv-table .inv-subitem {
       display: block !important;
       font-size: 8.5pt !important;
@@ -320,7 +245,6 @@ export function printInvoice() {
       margin-top: 2px !important;
       font-style: italic !important;
     }
-
     .invoice-print table.inv-table .inv-total-row td {
       border-top: 2px solid var(--gvd-burgundy) !important;
       border-bottom: none !important;
@@ -329,19 +253,14 @@ export function printInvoice() {
       padding: 8px !important;
       font-size: 11pt !important;
     }
+    .invoice-print table.inv-table .inv-discount { color: #166534 !important; }
 
-    .invoice-print table.inv-table .inv-discount {
-      color: #166534 !important;
-    }
-
-    /* ===================== TOTALS PANEL ===================== */
     .invoice-print .inv-totals {
       width: 280px !important;
       margin-left: auto !important;
       margin-top: 8px !important;
       font-size: 10pt !important;
     }
-
     .invoice-print .inv-totals .inv-totals-row {
       display: flex !important;
       justify-content: space-between !important;
@@ -349,22 +268,16 @@ export function printInvoice() {
       padding: 4px 0 !important;
       border-bottom: 1px dotted #BBB !important;
     }
-
-    .invoice-print .inv-totals .inv-totals-row:last-child {
-      border-bottom: none !important;
-    }
-
+    .invoice-print .inv-totals .inv-totals-row:last-child { border-bottom: none !important; }
     .invoice-print .inv-totals .inv-totals-label {
       color: var(--gvd-ink) !important;
       font-weight: 400 !important;
     }
-
     .invoice-print .inv-totals .inv-totals-value {
       font-family: 'Roboto Mono', monospace !important;
       font-weight: 500 !important;
       color: var(--gvd-ink) !important;
     }
-
     .invoice-print .inv-totals .inv-totals-row.grand-total {
       background: var(--gvd-burgundy) !important;
       color: white !important;
@@ -379,7 +292,6 @@ export function printInvoice() {
       font-weight: 700 !important;
       font-size: 11.5pt !important;
     }
-
     .invoice-print .inv-totals .inv-totals-row.balance-due {
       background: #F5EFE7 !important;
       padding: 6px 12px !important;
@@ -393,13 +305,11 @@ export function printInvoice() {
       font-weight: 700 !important;
     }
 
-    /* ===================== FOOTER ===================== */
     .invoice-print .inv-footer {
       margin-top: 16px !important;
       padding-top: 10px !important;
       border-top: 1px solid var(--gvd-border) !important;
     }
-
     .invoice-print .inv-footer .inv-bank-row {
       display: grid !important;
       grid-template-columns: 1fr auto !important;
@@ -409,7 +319,6 @@ export function printInvoice() {
       margin-bottom: 10px !important;
       border-bottom: 1px dashed var(--gvd-border) !important;
     }
-
     .invoice-print .inv-footer .inv-bank-title {
       font-family: 'Playfair Display', Georgia, serif !important;
       font-weight: 700 !important;
@@ -419,20 +328,13 @@ export function printInvoice() {
       text-transform: uppercase !important;
       margin-bottom: 4px !important;
     }
-
     .invoice-print .inv-footer .inv-bank-detail {
       font-size: 9pt !important;
       color: var(--gvd-ink) !important;
       padding: 1px 0 !important;
     }
-    .invoice-print .inv-footer .inv-bank-detail strong {
-      font-weight: 600 !important;
-    }
-
-    .invoice-print .inv-footer .inv-qr {
-      text-align: center !important;
-    }
-
+    .invoice-print .inv-footer .inv-bank-detail strong { font-weight: 600 !important; }
+    .invoice-print .inv-footer .inv-qr { text-align: center !important; }
     .invoice-print .inv-footer .inv-qr img,
     .invoice-print .inv-footer .inv-qr svg {
       max-width: 70px !important;
@@ -440,7 +342,6 @@ export function printInvoice() {
       width: auto !important;
       height: auto !important;
     }
-
     .invoice-print .inv-footer .inv-qr .inv-qr-caption {
       font-size: 7.5pt !important;
       font-weight: 600 !important;
@@ -449,13 +350,11 @@ export function printInvoice() {
       letter-spacing: 0.1em !important;
       text-transform: uppercase !important;
     }
-
     .invoice-print .inv-footer .inv-qr .inv-qr-sub {
       font-size: 7pt !important;
       color: var(--gvd-gray) !important;
       margin-top: 1px !important;
     }
-
     .invoice-print .inv-footer .inv-sign-row {
       display: grid !important;
       grid-template-columns: 1fr 1fr 1fr !important;
@@ -463,7 +362,6 @@ export function printInvoice() {
       align-items: end !important;
       margin-top: 10px !important;
     }
-
     .invoice-print .inv-footer .inv-terms {
       font-size: 8.5pt !important;
       color: var(--gvd-gray) !important;
@@ -480,13 +378,11 @@ export function printInvoice() {
       padding: 1px 0 !important;
       line-height: 1.4 !important;
     }
-
     .invoice-print .inv-footer .inv-sign-arch {
       display: flex !important;
       flex-direction: column !important;
       align-items: center !important;
     }
-
     .invoice-print .inv-footer .inv-sign-arch-box {
       width: 100px !important;
       height: 32px !important;
@@ -494,7 +390,6 @@ export function printInvoice() {
       border-bottom: none !important;
       border-radius: 60px 60px 0 0 !important;
     }
-
     .invoice-print .inv-footer .inv-sign-label {
       font-size: 8.5pt !important;
       font-weight: 500 !important;
@@ -502,7 +397,6 @@ export function printInvoice() {
       margin-top: 4px !important;
       letter-spacing: 0.05em !important;
     }
-
     .invoice-print .inv-footer .inv-hotel-sign {
       text-align: center !important;
       font-size: 9pt !important;
@@ -530,7 +424,6 @@ export function printInvoice() {
       letter-spacing: 0.05em !important;
       text-transform: uppercase !important;
     }
-
     .invoice-print .inv-footer .inv-brand-footer {
       margin-top: 14px !important;
       padding-top: 8px !important;
@@ -547,12 +440,8 @@ export function printInvoice() {
       text-transform: uppercase !important;
     }
 
-    /* Hide elements marked no-print */
     .no-print { display: none !important; }
 
-    /* ====== CRITICAL: Input/Select rendering in print ======
-       When printing from edit mode, inputs and selects must render as plain text.
-       We override ALL Tailwind/shadcn input styles with maximum specificity. */
     .invoice-print input[type="text"],
     .invoice-print input[type="number"],
     .invoice-print input[type="date"],
@@ -580,11 +469,7 @@ export function printInvoice() {
       border-radius: 0 !important;
       font-weight: inherit !important;
     }
-
-    /* Selects: hide the dropdown arrow */
     .invoice-print select::-ms-expand { display: none !important; }
-
-    /* Textareas: render as block text */
     .invoice-print textarea {
       display: block !important;
       resize: none !important;
@@ -592,13 +477,8 @@ export function printInvoice() {
       white-space: pre-wrap !important;
       word-wrap: break-word !important;
     }
+    .invoice-print button { display: none !important; }
 
-    /* Buttons: hide all buttons in print */
-    .invoice-print button {
-      display: none !important;
-    }
-
-    /* Reset Tailwind utility conflicts for printed invoice */
     .invoice-print .text-2xl { font-size: 22px !important; }
     .invoice-print .text-xl { font-size: 18px !important; }
     .invoice-print .text-lg { font-size: 14px !important; }
@@ -606,14 +486,11 @@ export function printInvoice() {
     .invoice-print .text-sm { font-size: 10.5px !important; }
     .invoice-print .text-xs { font-size: 9.5px !important; }
 
-    /* Grid layout for edit-mode customer details */
     .invoice-print .inv-customer.grid {
       display: grid !important;
       grid-template-columns: 1fr 1fr !important;
       gap: 6px 12px !important;
     }
-
-    /* Edit-mode field labels */
     .invoice-print .inv-customer.grid label {
       font-size: 7.5pt !important;
       text-transform: uppercase !important;
@@ -623,21 +500,16 @@ export function printInvoice() {
       display: block !important;
       margin-bottom: 1px !important;
     }
-
-    /* Edit-mode items table inputs — render inline */
     .invoice-print table.inv-table input[type="text"],
     .invoice-print table.inv-table input[type="number"] {
       width: 100% !important;
       min-width: 0 !important;
       text-align: inherit !important;
     }
-
     .invoice-print table.inv-table .inv-rate input {
       text-align: right !important;
       font-family: 'Roboto Mono', monospace !important;
     }
-
-    /* Remove the flex wrapper around qty×rate inputs */
     .invoice-print table.inv-table .inv-rate .flex {
       display: inline-flex !important;
       gap: 2px !important;
@@ -645,7 +517,50 @@ export function printInvoice() {
       justify-content: flex-end !important;
       width: 100% !important;
     }
+`
 
+const FONTS_LINK = `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500;600&display=swap" rel="stylesheet">`
+
+// Sanitize a string for use as a filename component
+function sanitizeFilenamePart(s: string | null | undefined): string {
+  if (!s) return ''
+  return s.trim().replace(/[^\w\s-]/g, '').replace(/\s+/g, '').slice(0, 30)
+}
+
+// Build a suggested PDF filename from invoice metadata
+// Format: Invoice_<number>_<customerName>_<roomTypes>.pdf
+export function buildPdfFilename(opts: {
+  invoiceNumber?: string
+  customerName?: string
+  roomType?: string | null
+}): string {
+  const parts: string[] = []
+  parts.push('Invoice')
+  if (opts.invoiceNumber) parts.push(sanitizeFilenamePart(opts.invoiceNumber))
+  if (opts.customerName) parts.push(sanitizeFilenamePart(opts.customerName))
+  if (opts.roomType) {
+    // roomType may be comma-separated — join with hyphen
+    const rooms = opts.roomType.split(',').map(s => sanitizeFilenamePart(s)).filter(Boolean).join('-')
+    if (rooms) parts.push(rooms)
+  }
+  const name = parts.filter(Boolean).join('_')
+  return `${name || 'Invoice'}.pdf`
+}
+
+// Build the full HTML document for the invoice iframe
+function buildInvoiceHtml(clone: HTMLElement, suggestedFilename: string, parentStyles: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${suggestedFilename}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  ${parentStyles}
+  ${FONTS_LINK}
+  <style>
+    ${PRINT_STYLES}
     @media print {
       body { background: white; }
       .invoice-print { box-shadow: none !important; }
@@ -655,20 +570,11 @@ export function printInvoice() {
 <body>
   ${clone.outerHTML}
 </body>
-</html>`)
-  doc.close()
+</html>`
+}
 
-  // Wait for fonts AND images to load before printing
-  const win = iframe.contentWindow
-  if (!win) {
-    setTimeout(() => {
-      try { window.print() } catch (e) { console.error('Print fallback failed:', e) }
-      setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe) }, 1000)
-    }, 800)
-    return
-  }
-
-  // Promise that resolves when all images in the iframe are loaded
+// Wait for images + fonts to load in an iframe document
+function waitForIframeReady(doc: Document): Promise<void> {
   const imagesLoaded = new Promise<void>((resolve) => {
     const imgs = Array.from(doc.images)
     if (imgs.length === 0) { resolve(); return }
@@ -681,19 +587,73 @@ export function printInvoice() {
         img.addEventListener('error', check, { once: true })
       }
     })
-    // Safety timeout: don't wait forever
     setTimeout(resolve, 2000)
   })
-
-  // Promise that resolves when web fonts are loaded
   const fontsLoaded = (doc.fonts && doc.fonts.ready) ? doc.fonts.ready : Promise.resolve()
-
-  // Promise that gives the iframe's DOM time to layout
   const layoutReady = new Promise<void>(resolve => setTimeout(resolve, 300))
+  return Promise.all([imagesLoaded, fontsLoaded, layoutReady]).then(() => undefined)
+}
 
-  Promise.all([imagesLoaded, fontsLoaded, layoutReady]).then(() => {
+// Create a hidden iframe with the invoice HTML loaded into it
+function createInvoiceIframe(clone: HTMLElement, suggestedFilename: string): HTMLIFrameElement {
+  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+    .map(node => node.outerHTML)
+    .join('\n')
+
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.right = '0'
+  iframe.style.bottom = '0'
+  iframe.style.width = '0'
+  iframe.style.height = '0'
+  iframe.style.border = '0'
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentWindow?.document
+  if (doc) {
+    doc.open()
+    doc.write(buildInvoiceHtml(clone, suggestedFilename, styles))
+    doc.close()
+  }
+  return iframe
+}
+
+// Open the browser's print dialog for the .invoice-print element.
+// The suggested filename is set as the iframe document's <title> so the
+// browser's "Save as PDF" dialog defaults to that name.
+export function printInvoice(filenameOpts?: {
+  invoiceNumber?: string
+  customerName?: string
+  roomType?: string | null
+}) {
+  const el = document.querySelector('.invoice-print') as HTMLElement
+  if (!el) {
+    window.print()
+    return
+  }
+
+  const clone = el.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.no-print').forEach(e => e.remove())
+
+  const suggestedFilename = buildPdfFilename(filenameOpts || {})
+  const iframe = createInvoiceIframe(clone, suggestedFilename)
+  const doc = iframe.contentWindow?.document
+  const win = iframe.contentWindow
+
+  if (!doc || !win) {
+    setTimeout(() => {
+      try { window.print() } catch (e) { console.error('Print fallback failed:', e) }
+      setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe) }, 1000)
+    }, 800)
+    return
+  }
+
+  waitForIframeReady(doc).then(() => {
     try {
       win.focus()
+      // Set the document title right before printing — browsers use this as the
+      // default "Save as PDF" filename in the print dialog.
+      doc.title = suggestedFilename.replace(/\.pdf$/i, '')
       win.print()
     } catch (e) {
       console.error('Print failed:', e)
@@ -703,4 +663,170 @@ export function printInvoice() {
       if (iframe.parentNode) document.body.removeChild(iframe)
     }, 2000)
   })
+}
+
+// ===== PRINT PREVIEW =====
+//
+// Opens a full-screen modal showing exactly what will be printed.
+// The user reviews the preview, then clicks "Print" to open the browser's
+// print dialog (with the suggested filename pre-filled).
+
+let previewContainer: HTMLDivElement | null = null
+
+export function previewInvoice(filenameOpts?: {
+  invoiceNumber?: string
+  customerName?: string
+  roomType?: string | null
+}): void {
+  const el = document.querySelector('.invoice-print') as HTMLElement
+  if (!el) {
+    printInvoice(filenameOpts)
+    return
+  }
+
+  // Remove any existing preview
+  closePreview()
+
+  const clone = el.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('.no-print').forEach(e => e.remove())
+
+  const suggestedFilename = buildPdfFilename(filenameOpts || {})
+
+  // Build the preview container
+  previewContainer = document.createElement('div')
+  previewContainer.id = 'invoice-preview-overlay'
+  previewContainer.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 16px;
+    overflow-y: auto;
+  `
+
+  // Toolbar
+  const toolbar = document.createElement('div')
+  toolbar.style.cssText = `
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    padding: 12px 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    max-width: 800px;
+    width: 100%;
+  `
+
+  const title = document.createElement('span')
+  title.textContent = 'Print Preview'
+  title.style.cssText = 'font-family: Inter, Arial, sans-serif; font-weight: 700; font-size: 16px; color: #1A1A1A; flex: 1;'
+
+  const filenameLabel = document.createElement('span')
+  filenameLabel.textContent = `PDF: ${suggestedFilename}`
+  filenameLabel.style.cssText = 'font-family: Roboto Mono, monospace; font-size: 11px; color: #6B7280; background: #F3F4F6; padding: 4px 8px; border-radius: 4px;'
+
+  const printBtn = document.createElement('button')
+  printBtn.textContent = '🖨️ Print / Save PDF'
+  printBtn.style.cssText = `
+    background: #8B1A1A;
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: Inter, Arial, sans-serif;
+  `
+  printBtn.onmouseover = () => { printBtn.style.background = '#6B0F1A' }
+  printBtn.onmouseout = () => { printBtn.style.background = '#8B1A1A' }
+  printBtn.onclick = () => {
+    closePreview()
+    // Small delay to let the preview close before opening print dialog
+    setTimeout(() => printInvoice(filenameOpts), 100)
+  }
+
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕ Close'
+  closeBtn.style.cssText = `
+    background: transparent;
+    color: #6B7280;
+    border: 1px solid #D4D4D8;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: Inter, Arial, sans-serif;
+  `
+  closeBtn.onmouseover = () => { closeBtn.style.background = '#F3F4F6' }
+  closeBtn.onmouseout = () => { closeBtn.style.background = 'transparent' }
+  closeBtn.onclick = closePreview
+
+  toolbar.appendChild(title)
+  toolbar.appendChild(filenameLabel)
+  toolbar.appendChild(printBtn)
+  toolbar.appendChild(closeBtn)
+  previewContainer.appendChild(toolbar)
+
+  // Preview iframe — renders the invoice exactly as it will print
+  const previewWrapper = document.createElement('div')
+  previewWrapper.style.cssText = `
+    background: #E5E5E5;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    max-width: 820px;
+    width: 100%;
+  `
+
+  const previewIframe = document.createElement('iframe')
+  previewIframe.style.cssText = `
+    width: 100%;
+    height: 80vh;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+  `
+  previewWrapper.appendChild(previewIframe)
+  previewContainer.appendChild(previewWrapper)
+
+  document.body.appendChild(previewContainer)
+
+  // Load the invoice HTML into the preview iframe
+  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+    .map(node => node.outerHTML)
+    .join('\n')
+  const pdoc = previewIframe.contentWindow?.document
+  if (pdoc) {
+    pdoc.open()
+    pdoc.write(buildInvoiceHtml(clone, suggestedFilename, styles))
+    pdoc.close()
+  }
+
+  // Close preview on Escape
+  const escHandler = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      closePreview()
+      document.removeEventListener('keydown', escHandler)
+    }
+  }
+  document.addEventListener('keydown', escHandler)
+}
+
+function closePreview() {
+  if (previewContainer && previewContainer.parentNode) {
+    previewContainer.parentNode.removeChild(previewContainer)
+  }
+  previewContainer = null
 }

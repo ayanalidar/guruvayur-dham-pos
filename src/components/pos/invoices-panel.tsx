@@ -1,5 +1,5 @@
 'use client'
-import { printInvoice } from '@/lib/print'
+import { previewInvoice } from '@/lib/print'
 
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -633,7 +633,11 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => previewInvoice({
+            invoiceNumber: invoice.invoiceNumber,
+            customerName: invoice.guestName,
+            roomType: invoice.roomNumber ? `Room-${invoice.roomNumber}` : undefined,
+          })}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -903,7 +907,11 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => previewInvoice({
+            invoiceNumber: invoice.invoiceNumber,
+            customerName: invoice.customerName,
+            roomType: invoice.roomNumber ? `Room-${invoice.roomNumber}` : undefined,
+          })}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1222,12 +1230,11 @@ type CustomInvoice = {
 }
 
 // Room type options for custom invoices
-const ROOM_TYPES = ['Single Bed', 'Double Bed', 'Twin Bed', 'Deluxe Room', 'Family Room', 'Suite'] as const
+const ROOM_TYPES = ['Superior Room', 'Twin Bed', 'Deluxe Room', 'Family Room', 'Suite'] as const
 
 // Default rate per night for each room type (used when auto-adding a room line)
 const DEFAULT_ROOM_RATES: Record<string, number> = {
-  'Single Bed': 999,
-  'Double Bed': 1499,
+  'Superior Room': 1200,
   'Twin Bed': 1799,
   'Deluxe Room': 2499,
   'Family Room': 2999,
@@ -1989,7 +1996,11 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
             <Trash2 className="h-4 w-4 mr-2" /> Delete
           </Button>
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={() => printInvoice()}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+          <Button onClick={() => previewInvoice({
+            invoiceNumber: invoice.invoiceNumber,
+            customerName: invoice.customerName,
+            roomType: invoice.roomType,
+          })}><Printer className="h-4 w-4 mr-2" /> Print</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
