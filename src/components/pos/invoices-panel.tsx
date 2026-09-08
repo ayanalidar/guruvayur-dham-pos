@@ -433,6 +433,7 @@ function HotelInvoiceDialog({ invoice, onClose }: { invoice: HotelInvoice | null
             onNumberChange={() => {}}
             onEditClick={undefined}
             savingNumber={false}
+            date={invoice.createdAt}
           />
 
           {/* Customer details — editable when in edit mode, dotted leaders otherwise */}
@@ -776,6 +777,7 @@ function FoodInvoiceDialog({ invoice, onClose }: { invoice: FoodInvoice | null; 
             onNumberChange={() => {}}
             onEditClick={undefined}
             savingNumber={false}
+            date={invoice.createdAt}
           />
 
           {editMode && form ? (
@@ -927,6 +929,7 @@ function InvoiceHeader({
   editableNumber = null,
   onNumberChange, onSaveNumber, onCancelEdit, onEditClick, savingNumber = false,
   copyNote = 'Original',
+  date,
 }: {
   config: Config | null; invoiceNumber: string; title: string
   editableNumber?: string | null
@@ -936,7 +939,9 @@ function InvoiceHeader({
   onEditClick?: () => void
   savingNumber?: boolean
   copyNote?: string
+  date?: string | Date
 }) {
+  const displayDate = date ? formatDateShort(typeof date === 'string' ? new Date(date) : date) : formatDateShort(new Date())
   return (
     <div className="mb-3">
       {/* Top strip: GSTIN | TAX INVOICE | Original/Duplicate */}
@@ -951,6 +956,8 @@ function InvoiceHeader({
         <img
           src="/guruvayur-logo.png"
           alt="GVD"
+          width={180}
+          height={70}
           style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.12))' }}
         />
         <div className="inv-brand-text">
@@ -1013,7 +1020,7 @@ function InvoiceHeader({
         </div>
         <div className="text-right">
           <p className="inv-meta-label">Date</p>
-          <p className="inv-meta-value">{formatDateShort(new Date())}</p>
+          <p className="inv-meta-value">{displayDate}</p>
         </div>
       </div>
     </div>
@@ -1778,7 +1785,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
         <div className="flex-1 overflow-y-auto">
         <div className="invoice-print bg-white p-6 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
-          <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" />
+          <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" date={invoice.createdAt} />
 
           {/* Customer details — same format as hotel invoice */}
           {editMode && form ? (
@@ -1851,29 +1858,35 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                 <th className="inv-particulars">Particulars</th>
                 <th className="inv-rate" style={{ textAlign: 'right' }}>Rate</th>
                 <th className="inv-amount" style={{ textAlign: 'right' }}>Amount</th>
+                {editMode && <th style={{ width: '32px' }} className="no-print"></th>}
               </tr>
             </thead>
             <tbody>
               {editMode && form ? (
                 <>
                   {items.map((it: any, idx: number) => (
-                    <tr key={idx}>
+                    <tr key={idx} className={it.__roomLine ? 'bg-emerald-50/60' : ''}>
                       <td className="inv-sr">{idx + 1}</td>
                       <td className="inv-particulars">
-                        <Input value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-6 text-xs border-0 bg-transparent" />
+                        <Input value={it.name} onChange={e => updateItem(idx, 'name', e.target.value)} className="h-7 text-xs border-0 bg-transparent shadow-none focus-visible:ring-0" />
                       </td>
                       <td className="inv-rate">
-                        <div className="flex gap-1">
-                          <Input type="number" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-6 text-xs w-12 border-0 bg-transparent" />
-                          <span className="text-xs self-center">×</span>
-                          <Input type="number" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-6 text-xs w-16 border-0 bg-transparent" />
+                        <div className="flex gap-1 items-center justify-end">
+                          <Input type="number" value={it.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="h-7 text-xs w-12 border-0 bg-transparent text-right shadow-none focus-visible:ring-0 font-mono" />
+                          <span className="text-xs">×</span>
+                          <Input type="number" value={it.rate} onChange={e => updateItem(idx, 'rate', e.target.value)} className="h-7 text-xs w-20 border-0 bg-transparent text-right shadow-none focus-visible:ring-0 font-mono" />
                         </div>
                       </td>
                       <td className="inv-amount">{formatINR((it.quantity || 0) * (it.rate || 0))}</td>
+                      <td className="no-print" style={{ padding: '2px 4px' }}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeItem(idx)} title="Remove item">
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={4} style={{ padding: '4px 8px' }}>
+                    <td colSpan={5} style={{ padding: '4px 8px' }}>
                       <Button size="sm" variant="ghost" onClick={addItem}><Plus className="h-3 w-3 mr-1" /> Add Item</Button>
                     </td>
                   </tr>
@@ -1892,13 +1905,15 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               )}
               {(editMode ? Number(form.discount) : invoice.discount) > 0 && (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: 'right' }}>Discount</td>
+                  <td colSpan={editMode ? 4 : 3} style={{ textAlign: 'right' }}>Discount</td>
                   <td className="inv-amount inv-discount">- {formatINR(editMode ? Number(form.discount) : invoice.discount)}</td>
+                  {editMode && <td className="no-print"></td>}
                 </tr>
               )}
               <tr className="inv-total-row">
-                <td colSpan={3} style={{ textAlign: 'right' }}>Total</td>
+                <td colSpan={editMode ? 4 : 3} style={{ textAlign: 'right' }}>Total</td>
                 <td className="inv-amount">{formatINR(editMode ? Number(form.itemsTotal) - Number(form.discount) : invoice.itemsTotal - invoice.discount)}</td>
+                {editMode && <td className="no-print"></td>}
               </tr>
             </tbody>
           </table>

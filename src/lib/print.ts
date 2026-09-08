@@ -2,6 +2,7 @@
 
 // Print invoice using a hidden iframe.
 // Injects a professional A4 print stylesheet with Google Fonts (Playfair Display, Inter, Roboto Mono).
+// Waits for fonts + images to load before triggering print to avoid blank/broken output.
 export function printInvoice() {
   const el = document.querySelector('.invoice-print') as HTMLElement
   if (!el) {
@@ -51,7 +52,7 @@ export function printInvoice() {
        Design language: editorial / hospitality-premium
        Palette: deep burgundy #8B1A1A + warm cream #FBF7F0 + dark ink #1A1A1A + soft gold #C19A4B
        Typography: Playfair Display (headings) + Inter (body) + Roboto Mono (numbers)
-       Page: A4 portrait (210mm x 297mm) with 10mm margins
+       Page: A4 portrait (210mm x 297mm) with 8mm margins
     */
 
     :root {
@@ -100,6 +101,9 @@ export function printInvoice() {
       font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
       font-size: 10.5pt !important;
       line-height: 1.45 !important;
+      box-shadow: none !important;
+      border: none !important;
+      overflow: visible !important;
     }
 
     /* ===================== HEADER ===================== */
@@ -146,7 +150,7 @@ export function printInvoice() {
       max-height: 70px !important;
       max-width: 180px !important;
       width: auto !important;
-      height: auto !important;
+      height: 70px !important;
       object-fit: contain !important;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12)) !important;
     }
@@ -546,18 +550,52 @@ export function printInvoice() {
     /* Hide elements marked no-print */
     .no-print { display: none !important; }
 
-    /* Inputs in edit mode should render as plain text in print */
-    .invoice-print input,
-    .invoice-print select {
+    /* ====== CRITICAL: Input/Select rendering in print ======
+       When printing from edit mode, inputs and selects must render as plain text.
+       We override ALL Tailwind/shadcn input styles with maximum specificity. */
+    .invoice-print input[type="text"],
+    .invoice-print input[type="number"],
+    .invoice-print input[type="date"],
+    .invoice-print input[type="datetime-local"],
+    .invoice-print input:not([type]),
+    .invoice-print select,
+    .invoice-print textarea {
       border: none !important;
       background: transparent !important;
-      font-size: 10pt !important;
-      padding: 0 !important;
+      font-size: inherit !important;
+      padding: 0 2px !important;
+      margin: 0 !important;
       height: auto !important;
+      width: 100% !important;
+      min-height: 0 !important;
       -webkit-appearance: none !important;
+      -moz-appearance: none !important;
       appearance: none !important;
       outline: none !important;
       box-shadow: none !important;
+      color: var(--gvd-ink) !important;
+      font-family: inherit !important;
+      line-height: inherit !important;
+      display: inline !important;
+      border-radius: 0 !important;
+      font-weight: inherit !important;
+    }
+
+    /* Selects: hide the dropdown arrow */
+    .invoice-print select::-ms-expand { display: none !important; }
+
+    /* Textareas: render as block text */
+    .invoice-print textarea {
+      display: block !important;
+      resize: none !important;
+      overflow: hidden !important;
+      white-space: pre-wrap !important;
+      word-wrap: break-word !important;
+    }
+
+    /* Buttons: hide all buttons in print */
+    .invoice-print button {
+      display: none !important;
     }
 
     /* Reset Tailwind utility conflicts for printed invoice */
@@ -567,6 +605,46 @@ export function printInvoice() {
     .invoice-print .text-base { font-size: 12px !important; }
     .invoice-print .text-sm { font-size: 10.5px !important; }
     .invoice-print .text-xs { font-size: 9.5px !important; }
+
+    /* Grid layout for edit-mode customer details */
+    .invoice-print .inv-customer.grid {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 6px 12px !important;
+    }
+
+    /* Edit-mode field labels */
+    .invoice-print .inv-customer.grid label {
+      font-size: 7.5pt !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.1em !important;
+      color: var(--gvd-gray) !important;
+      font-weight: 600 !important;
+      display: block !important;
+      margin-bottom: 1px !important;
+    }
+
+    /* Edit-mode items table inputs — render inline */
+    .invoice-print table.inv-table input[type="text"],
+    .invoice-print table.inv-table input[type="number"] {
+      width: 100% !important;
+      min-width: 0 !important;
+      text-align: inherit !important;
+    }
+
+    .invoice-print table.inv-table .inv-rate input {
+      text-align: right !important;
+      font-family: 'Roboto Mono', monospace !important;
+    }
+
+    /* Remove the flex wrapper around qty×rate inputs */
+    .invoice-print table.inv-table .inv-rate .flex {
+      display: inline-flex !important;
+      gap: 2px !important;
+      align-items: center !important;
+      justify-content: flex-end !important;
+      width: 100% !important;
+    }
 
     @media print {
       body { background: white; }
@@ -580,10 +658,43 @@ export function printInvoice() {
 </html>`)
   doc.close()
 
-  setTimeout(() => {
+  // Wait for fonts AND images to load before printing
+  const win = iframe.contentWindow
+  if (!win) {
+    setTimeout(() => {
+      try { window.print() } catch (e) { console.error('Print fallback failed:', e) }
+      setTimeout(() => { if (iframe.parentNode) document.body.removeChild(iframe) }, 1000)
+    }, 800)
+    return
+  }
+
+  // Promise that resolves when all images in the iframe are loaded
+  const imagesLoaded = new Promise<void>((resolve) => {
+    const imgs = Array.from(doc.images)
+    if (imgs.length === 0) { resolve(); return }
+    let loaded = 0
+    const check = () => { loaded++; if (loaded >= imgs.length) resolve() }
+    imgs.forEach(img => {
+      if (img.complete) { check() }
+      else {
+        img.addEventListener('load', check, { once: true })
+        img.addEventListener('error', check, { once: true })
+      }
+    })
+    // Safety timeout: don't wait forever
+    setTimeout(resolve, 2000)
+  })
+
+  // Promise that resolves when web fonts are loaded
+  const fontsLoaded = (doc.fonts && doc.fonts.ready) ? doc.fonts.ready : Promise.resolve()
+
+  // Promise that gives the iframe's DOM time to layout
+  const layoutReady = new Promise<void>(resolve => setTimeout(resolve, 300))
+
+  Promise.all([imagesLoaded, fontsLoaded, layoutReady]).then(() => {
     try {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
+      win.focus()
+      win.print()
     } catch (e) {
       console.error('Print failed:', e)
       window.print()
@@ -591,5 +702,5 @@ export function printInvoice() {
     setTimeout(() => {
       if (iframe.parentNode) document.body.removeChild(iframe)
     }, 2000)
-  }, 1200)
+  })
 }
