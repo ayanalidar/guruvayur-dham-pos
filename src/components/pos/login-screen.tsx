@@ -8,7 +8,7 @@ import { Delete, LogIn, Shield, Loader2 } from 'lucide-react'
 import { apiFetch } from '@/lib/format'
 import { GuardianXBrand } from './guardianx-brand'
 
-type Config = { name: string; hasPin: boolean }
+type Config = { name: string; hasPin: boolean; posPin?: string }
 
 export function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
   const { toast } = useToast()

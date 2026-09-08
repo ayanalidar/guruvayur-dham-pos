@@ -930,9 +930,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 // ===== Customer Search component with autocomplete dropdown =====
 // Searches the Customer master DB by name/phone/GSTIN/email.
-// When a customer is selected, calls onSelect with their details.
-// Shows a "Save as new customer" checkbox that callers can use to decide
-// whether to persist the current form values as a new customer record.
+// When a customer is selected from the dropdown, calls onSelect with their details.
+// Typing in the search box does NOT update the form — only selecting from
+// the dropdown triggers onSelect. This prevents the form's customerName from
+// being overwritten while the user is just typing to search.
 function CustomerSearch({ onSelect }: {
   onSelect: (customer: { id?: string; name: string; phone?: string | null; email?: string | null; gstin?: string | null; address?: string | null }) => void
 }) {
@@ -978,12 +979,18 @@ function CustomerSearch({ onSelect }: {
     })
   }
 
+  function clearSearch() {
+    setQuery('')
+    setResults([])
+    setShowDropdown(false)
+  }
+
   return (
     <div className="relative">
       <div className="relative">
         <Input
           value={query}
-          onChange={e => { setQuery(e.target.value); onSelect({ name: e.target.value }) }}
+          onChange={e => setQuery(e.target.value)}
           placeholder="Search existing customers by name, phone, GSTIN…"
           className="h-8 text-xs pr-8"
           onFocus={() => { if (results.length > 0) setShowDropdown(true) }}
@@ -995,8 +1002,9 @@ function CustomerSearch({ onSelect }: {
         {!loading && query && (
           <button
             type="button"
-            onClick={() => { setQuery(''); onSelect({ name: '' }); setResults([]); setShowDropdown(false) }}
+            onClick={clearSearch}
             className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+            title="Clear search"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -1026,7 +1034,7 @@ function CustomerSearch({ onSelect }: {
       )}
       {showDropdown && results.length === 0 && !loading && query.trim().length >= 2 && (
         <div className="absolute z-50 left-0 right-0 mt-1 bg-white border rounded shadow-lg p-2 text-xs text-muted-foreground">
-          No existing customer found. Fill in the details below — check "Save as new customer" to add them for future use.
+          No existing customer found. Fill in the details below — check &quot;Save as new customer&quot; to add them for future use.
         </div>
       )}
     </div>
@@ -2169,7 +2177,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                 { label: 'Taxable Amount', value: invoice.itemsTotal - invoice.discount },
                 ...(invoice.cgstAmount > 0 ? [{ label: `CGST (${invoice.cgstRate}%)`, value: invoice.cgstAmount }] : []),
                 ...(invoice.sgstAmount > 0 ? [{ label: `SGST (${invoice.sgstRate}%)`, value: invoice.sgstAmount }] : []),
-                ...(invoice.igstAmount > 0 ? [{ label: `IGST (${invoice.igstRate}%)`, value: invoice.igstAmount }] : []),
+                ...((invoice.igstAmount ?? 0) > 0 ? [{ label: `IGST (${invoice.igstRate ?? 0}%)`, value: invoice.igstAmount ?? 0 }] : []),
                 { label: 'G. TOTAL', value: invoice.grandTotal, bold: true, doubleTop: true, primary: true },
               ]}
             />
