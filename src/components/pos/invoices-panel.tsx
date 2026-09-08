@@ -1,7 +1,7 @@
 'use client'
 import { previewInvoice } from '@/lib/print'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -928,6 +928,111 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+// ===== Customer Search component with autocomplete dropdown =====
+// Searches the Customer master DB by name/phone/GSTIN/email.
+// When a customer is selected, calls onSelect with their details.
+// Shows a "Save as new customer" checkbox that callers can use to decide
+// whether to persist the current form values as a new customer record.
+function CustomerSearch({ onSelect }: {
+  onSelect: (customer: { id?: string; name: string; phone?: string | null; email?: string | null; gstin?: string | null; address?: string | null }) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounced search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!query.trim() || query.trim().length < 2) {
+      setResults([])
+      setShowDropdown(false)
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const d = await apiFetch<{ customers: any[] }>(`/api/customers?q=${encodeURIComponent(query.trim())}`)
+        setResults(d.customers)
+        setShowDropdown(true)
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    }, 250)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [query])
+
+  function pick(c: any) {
+    setQuery(c.name)
+    setShowDropdown(false)
+    onSelect({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      gstin: c.gstin,
+      address: c.address,
+    })
+  }
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <Input
+          value={query}
+          onChange={e => { setQuery(e.target.value); onSelect({ name: e.target.value }) }}
+          placeholder="Search existing customers by name, phone, GSTIN…"
+          className="h-8 text-xs pr-8"
+          onFocus={() => { if (results.length > 0) setShowDropdown(true) }}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        />
+        {loading && (
+          <RefreshCw className="h-3.5 w-3.5 animate-spin absolute right-2 top-2 text-muted-foreground" />
+        )}
+        {!loading && query && (
+          <button
+            type="button"
+            onClick={() => { setQuery(''); onSelect({ name: '' }); setResults([]); setShowDropdown(false) }}
+            className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {showDropdown && results.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border rounded shadow-lg max-h-60 overflow-y-auto">
+          {results.map((c: any) => (
+            <button
+              key={c.id}
+              type="button"
+              onMouseDown={(e) => { e.preventDefault(); pick(c) }}
+              className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b last:border-b-0 text-xs"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{c.name}</span>
+                {c.visitCount > 1 && <Badge variant="secondary" className="text-[9px]">{c.visitCount} visits</Badge>}
+              </div>
+              <div className="text-muted-foreground text-[10px] mt-0.5 flex gap-2 flex-wrap">
+                {c.phone && <span>📞 {c.phone}</span>}
+                {c.gstin && <span>🏛 {c.gstin}</span>}
+                {c.address && <span>📍 {c.address.slice(0, 30)}{c.address.length > 30 ? '…' : ''}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {showDropdown && results.length === 0 && !loading && query.trim().length >= 2 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border rounded shadow-lg p-2 text-xs text-muted-foreground">
+          No existing customer found. Fill in the details below — check "Save as new customer" to add them for future use.
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Reusable room-type multi-select checkboxes component
 function RoomTypeCheckboxes({ selected, onChange }: {
   selected: string[]
@@ -1368,6 +1473,8 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
   const [items, setItems] = useState<{ name: string; quantity: number; rate: number; __roomLine?: boolean; __roomType?: string }[]>([
     { name: '', quantity: 1, rate: 0 },
   ])
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
+  const [saveAsNewCustomer, setSaveAsNewCustomer] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -1377,6 +1484,8 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
       }).catch(() => {})
       setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', roomTypes: [], customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
       setItems([{ name: '', quantity: 1, rate: 0 }])
+      setSelectedCustomerId(null)
+      setSaveAsNewCustomer(false)
     }
   }, [open])
 
@@ -1463,6 +1572,38 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
           items: validItems,
         }),
       })
+
+      // Save / update customer master record
+      // - If an existing customer was selected: touch their visitCount + lastUsedAt
+      // - If "Save as new customer" is checked: create/update in the Customer DB
+      try {
+        if (selectedCustomerId) {
+          // Existing customer — increment visit count + update lastUsedAt
+          await apiFetch(`/api/customers/${selectedCustomerId}`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: form.customerName,
+              phone: form.customerPhone,
+              gstin: form.customerGstIn,
+              address: form.customerAddress,
+            }),
+          }).catch(() => {}) // non-blocking — invoice creation already succeeded
+        } else if (saveAsNewCustomer && form.customerName.trim()) {
+          // New customer — save to master DB for future reuse
+          await apiFetch('/api/customers', {
+            method: 'POST',
+            body: JSON.stringify({
+              name: form.customerName,
+              phone: form.customerPhone || undefined,
+              gstin: form.customerGstIn || undefined,
+              address: form.customerAddress || undefined,
+            }),
+          }).catch(() => {}) // non-blocking
+        }
+      } catch {
+        // Customer save failure should not block invoice creation
+      }
+
       toast({ title: `Custom invoice #${r.invoice.invoiceNumber} created`, description: formatINR(r.invoice.grandTotal) })
       onDone()
     } catch (e: any) {
@@ -1482,6 +1623,47 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-2 space-y-4">
+          {/* Customer search — autocomplete from master DB */}
+          <Field label="Search Existing Customer (repeat clients)">
+            <CustomerSearch onSelect={(c) => {
+              if (c.id) {
+                // Existing customer selected — fill all fields
+                setSelectedCustomerId(c.id)
+                setSaveAsNewCustomer(false)
+                setForm((f: any) => ({
+                  ...f,
+                  customerName: c.name || '',
+                  customerPhone: c.phone || '',
+                  customerGstIn: c.gstin || '',
+                  customerAddress: c.address || '',
+                }))
+              } else {
+                // User is typing a new name (or cleared search)
+                setSelectedCustomerId(null)
+                if (c.name !== undefined) {
+                  setForm((f: any) => ({ ...f, customerName: c.name }))
+                }
+              }
+            }} />
+          </Field>
+
+          {/* "Save as new customer" checkbox — only show when no existing customer is selected */}
+          {!selectedCustomerId && form.customerName.trim() && (
+            <label className="flex items-center gap-2 text-xs cursor-pointer bg-blue-50 border border-blue-200 rounded p-2">
+              <Checkbox
+                checked={saveAsNewCustomer}
+                onCheckedChange={(v) => setSaveAsNewCustomer(!!v)}
+                className="h-4 w-4"
+              />
+              <span>💾 Save this customer for future invoices (name, phone, GSTIN, address will be stored)</span>
+            </label>
+          )}
+          {selectedCustomerId && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-2">
+              ✓ Existing customer loaded. Their visit count will be updated when you create this invoice.
+            </p>
+          )}
+
           {/* Invoice number + Customer details */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Invoice Number (leave blank for auto)">
@@ -1812,6 +1994,26 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
           {/* Customer details — same format as hotel invoice */}
           {editMode && form ? (
+            <>
+            {/* Customer search — only in edit mode */}
+            <div className="mb-2 no-print">
+              <label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground block mb-1">Search Existing Customer (to autofill)</label>
+              <CustomerSearch onSelect={(c) => {
+                if (c.id) {
+                  setForm((prev: any) => ({
+                    ...prev,
+                    customerName: c.name || prev.customerName,
+                    customerPhone: c.phone || prev.customerPhone,
+                    customerGstIn: c.gstin || prev.customerGstIn,
+                    customerAddress: c.address || prev.customerAddress,
+                  }))
+                  // Touch the customer's visit count (non-blocking)
+                  apiFetch(`/api/customers/${c.id}`, { method: 'POST', body: JSON.stringify({}) }).catch(() => {})
+                } else if (c.name !== undefined) {
+                  setForm((prev: any) => ({ ...prev, customerName: c.name }))
+                }
+              }} />
+            </div>
             <div className="inv-customer grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
@@ -1835,6 +2037,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
               <Field label="IGST %"><Input type="number" step="0.1" value={form.igstRate || 0} onChange={e => setForm(recompute({ ...form, igstRate: Number(e.target.value) }))} className="h-7 text-xs" placeholder="0" /></Field>
               <Field label="Notes"><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="h-7 text-xs" /></Field>
             </div>
+            </>
           ) : (
             <div className="inv-customer">
               <LeaderRow>

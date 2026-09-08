@@ -193,6 +193,29 @@ model FoodInvoice {
   createdAt       DateTime @default(now())
 }
 
+// ----- Customer Master Database (for repeat custom-invoice clients) -----
+// Stores contact details of repeat customers so they can be quickly reused
+// when creating new custom invoices. Populated via:
+//   1. Explicit "Save as new customer" when creating a custom invoice
+//   2. Seed script that imports existing custom-invoice customers
+//   3. Future: auto-sync from hotel check-in guests
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String?  // unique key for deduplication when present
+  email       String?
+  gstin       String?
+  address     String?
+  notes       String?  // e.g. "VIP guest", "Prefers ground floor"
+  visitCount  Int      @default(1)  // incremented each time used in an invoice
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([phone])
+  @@index([name])
+}
+
 // ----- Custom Invoices (manual / ad-hoc) -----
 model CustomInvoice {
   id              String   @id @default(cuid())
