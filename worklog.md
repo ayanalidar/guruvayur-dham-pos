@@ -74,3 +74,62 @@ Stage Summary:
 - Production is live with the new logo, redesigned invoices, AND the Room Type feature
 - DB schema in sync with Neon (roomType column added)
 - Verified working end-to-end via API
+
+---
+Task ID: fix-print-and-editability-2026-09-08
+Agent: main
+Task: Fix print errors + make all custom invoice fields editable + verify everything
+
+Work Log:
+- Audited print.ts for root causes of print errors:
+  * Iframe didn't wait for images/fonts to load before printing
+  * Logo <img> had no explicit dimensions (layout shift before image loads)
+  * Input/select/textarea styles weren't overridden with enough specificity
+  * Tailwind global styles were overriding print styles
+- Rewrote print.ts:
+  * Promise.all waits for: doc.fonts.ready + all images loaded + 300ms layout
+  * Added explicit width={180} height={70} to logo <img>
+  * Added maximum-specificity overrides for input/select/textarea in print
+  * Hide all <button> elements in print output
+  * Hide select dropdown arrows via ::-ms-expand
+  * Added .invoice-print overflow:visible + box-shadow:none + border:none
+  * Added grid layout support for edit-mode customer details
+- Fixed InvoiceHeader to accept optional 'date' prop:
+  * All three invoice dialogs (Hotel/Food/Custom) now pass date={invoice.createdAt}
+  * Header shows the invoice's actual date, not today's date
+- Improved Custom Invoice edit-mode items table:
+  * Added per-row delete button (X icon, no-print column)
+  * Inputs: increased height h-6 -> h-7, added shadow-none, focus-visible:ring-0
+  * Rate/qty inputs use font-mono + text-right alignment
+  * Room-line rows highlighted with emerald background in edit mode
+  * Discount + Total rows: colSpan adjusts dynamically for edit mode's 5th column
+  * Table header: conditionally adds empty 5th column header in edit mode
+- Server-side recompute on PATCH /api/invoices/custom/[id]:
+  * If items/discount/tax rates change, server recomputes itemsTotal, taxable,
+    CGST/SGST/IGST amounts, and grandTotal
+  * Fetches existing invoice to get current values for fields not in the patch
+  * Applies IGST > 0 ? 0 : CGST+SGST rule automatically
+  * Sanitizes items (name trim, qty/rate clamped, amount computed)
+  * Ensures data consistency regardless of what the client sends
+- Re-linked Vercel CLI to correct project (guruvayur-dham-pos, not my-project)
+- Deployed via: npx vercel deploy --prod --token <user-scoped-token>
+
+Verification (all passed):
+- Production URL https://guruvayur-dham-pos.vercel.app returns HTTP 200
+- New logo reachable at /guruvayur-logo.png (HTTP 200)
+- 64 existing custom invoices intact
+- Create with all fields: itemsTotal, discount, tax amounts, grandTotal all correct
+- PATCH all fields: every field updated correctly + server-side recompute verified
+  * Changed items from 5×4999+1×500 to 2×999 — itemsTotal recomputed 25495 -> 1998
+  * Switched from CGST+SGST 2.5% to IGST 5% — amounts recomputed correctly
+  * grandTotal 26559.76 -> 2097.9 (server-side, no client-computed amounts sent)
+- Cleanup: test invoices deleted
+
+Stage Summary:
+- Print errors fixed: iframe now waits for fonts+images, inputs render as plain text
+- All custom invoice fields are editable: invoice number, customer name/phone/address/GSTIN,
+  room type, check-in/out dates, all items (name/qty/rate), discount, CGST/SGST/IGST rates,
+  payment method, notes
+- Server-side recompute ensures data consistency on every PATCH
+- Invoice header now shows the invoice's actual date, not today's date
+- Production is live and verified end-to-end
