@@ -20,7 +20,7 @@ export async function GET() {
 // For now, we rely on the PIN-gated frontend. In production, add a session check.
 export async function PATCH(req: NextRequest) {
   const body = await req.json()
-  const allowed = ['name', 'address', 'phone', 'email', 'gstNumber', 'sacCode', 'cgstRate', 'sgstRate', 'igstRate', 'posPin', 'reviewLink', 'bankName', 'bankAccount', 'bankIfsc', 'bankBranch']
+  const allowed = ['name', 'address', 'phone', 'email', 'gstNumber', 'sacCode', 'cgstRate', 'sgstRate', 'igstRate', 'posPin', 'reviewLink', 'whatsappNumber', 'bankName', 'bankAccount', 'bankIfsc', 'bankBranch']
   const data: Record<string, unknown> = {}
   for (const k of allowed) {
     if (body[k] != null) {

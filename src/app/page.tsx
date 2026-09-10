@@ -12,7 +12,7 @@ import { ReservationsPanel } from '@/components/pos/reservations-panel'
 import { LoginScreen } from '@/components/pos/login-screen'
 import { GuardianXBrand } from '@/components/pos/guardianx-brand'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut, Users, BarChart3, CalendarClock } from 'lucide-react'
+import { LayoutDashboard, Bed, Utensils, ClipboardList, Receipt, Settings, LogOut, Users, BarChart3, CalendarClock, Bell } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import { apiFetch } from '@/lib/format'
+import { useNewOrderNotifications } from '@/hooks/use-new-order-notifications'
 
 type Tab = 'dashboard' | 'rooms' | 'kitchen' | 'orders' | 'invoices' | 'guests' | 'reservations' | 'reports'
 
@@ -45,6 +46,30 @@ export default function Home() {
     if (typeof window === 'undefined') return false
     return sessionStorage.getItem('posAuth') === 'true'
   })
+
+  const { toast } = useToast()
+
+  // ===== Real-time order notifications =====
+  // Polls /api/orders?status=pending every 10 seconds when the POS tab is visible.
+  // Triggers: audio beep + desktop notification + toast when a new order arrives.
+  const { newOrders, clearNewOrder, permission, requestPermission } = useNewOrderNotifications({
+    onNewOrder: (order) => {
+      const roomLabel = order.roomNumber ? `Room ${order.roomNumber}` : 'Walk-in'
+      const itemCount = order.items?.reduce((s: number, it: any) => s + it.quantity, 0) ?? 0
+      toast({
+        title: `🍽️ New Order ${order.orderNumber}`,
+        description: `${roomLabel} · ${order.customerName} · ${itemCount} item(s) · ₹${order.grandTotal.toFixed(0)}`,
+      })
+    },
+    enabled: authed, // only poll when logged in
+  })
+
+  // Request notification permission on first load after auth
+  useEffect(() => {
+    if (authed && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      requestPermission()
+    }
+  }, [authed, requestPermission])
 
   function handleLogin() {
     setAuthed(true)
@@ -141,8 +166,34 @@ export default function Home() {
               {tab === 'kitchen' ? 'Kitchen & Menu' : tab === 'guests' ? 'Customer Records' : tab === 'reports' ? 'Reports & Day-Close' : tab}
             </h1>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
+          <div className="flex items-center gap-3">
+            {/* Notification bell — shows new order count + permission status */}
+            {newOrders.length > 0 && (
+              <Button
+                size="sm"
+                variant="default"
+                className="bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
+                onClick={() => { setTab('orders'); newOrders.forEach(clearNewOrder) }}
+                title={`${newOrders.length} new order(s) — click to view`}
+              >
+                <Bell className="h-4 w-4 mr-1.5" />
+                {newOrders.length} New
+              </Button>
+            )}
+            {permission === 'default' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={requestPermission}
+                title="Enable desktop notifications for new orders"
+                className="text-muted-foreground"
+              >
+                <Bell className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="text-xs text-muted-foreground">
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
           </div>
         </header>
 
@@ -255,6 +306,15 @@ function SettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               placeholder="https://share.google/..."
               onChange={e => setConfig({ ...config, reviewLink: e.target.value })}
             />
+          </FieldRow>
+          <FieldRow label="WhatsApp Number for Order Notifications (kitchen/reception)">
+            <Input
+              type="tel"
+              value={config.whatsappNumber ?? ''}
+              placeholder="919876543210 (country code + number, no + or spaces)"
+              onChange={e => setConfig({ ...config, whatsappNumber: e.target.value.replace(/[^\d]/g, '') })}
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">When a new food order arrives, staff can send it to this WhatsApp number with one click. Leave blank to let staff pick the recipient each time.</p>
           </FieldRow>
           <div className="grid grid-cols-2 gap-3">
             <FieldRow label="Bank Name">

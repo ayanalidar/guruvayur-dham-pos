@@ -24,6 +24,7 @@ model HotelConfig {
   igstRate      Float    @default(0.0)
   posPin        String   @default("1234") // 4-digit PIN for POS login
   reviewLink    String   @default("https://share.google/5fv3gDrquFN8LT1xb") // Google reviews link shared via WhatsApp
+  whatsappNumber String  @default("") // Kitchen/reception WhatsApp number for new-order notifications (e.g. "919876543210")
   bankName      String   @default("")
   bankAccount   String   @default("")
   bankIfsc      String   @default("")

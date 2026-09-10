@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useToast } from '@/hooks/use-toast'
-import { Clock, ChefHat, CheckCircle2, Utensils, X, RefreshCw, Receipt, Leaf, Drumstick, Download } from 'lucide-react'
+import { Clock, ChefHat, CheckCircle2, Utensils, X, RefreshCw, Receipt, Leaf, Drumstick, Download, MessageCircle } from 'lucide-react'
 import { formatINR, formatDate, apiFetch } from '@/lib/format'
 import { downloadOrders } from '@/lib/download'
+import { buildWhatsAppLink } from '@/hooks/use-new-order-notifications'
 
 type FoodOrder = {
   id: string; orderNumber: string; customerName: string; roomNumber: string | null; tableNumber: string | null
@@ -31,6 +32,12 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
   const [orders, setOrders] = useState<FoodOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('active')
+  const [config, setConfig] = useState<any>(null)
+
+  // Fetch hotel config (for whatsappNumber + hotelName)
+  useEffect(() => {
+    apiFetch<{ config: any }>('/api/config').then(d => setConfig(d.config)).catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -57,13 +64,21 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
     return () => { active = false }
   }, [toast])
 
-  // No polling — refresh on visibility change only (avoids blinking cards)
+  // Auto-refresh on visibility change + poll every 15 seconds when visible
+  // (so new orders from QR-code room service appear without manual refresh)
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') load()
     }
     document.addEventListener('visibilitychange', onVisible)
-    return () => document.removeEventListener('visibilitychange', onVisible)
+    // Poll every 15 seconds when the tab is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') load()
+    }, 15000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(interval)
+    }
   }, [load])
 
   async function updateStatus(order: FoodOrder, status: string) {
@@ -195,6 +210,8 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
               onNavigate={onNavigate}
               onCreateFoodInvoice={createFoodInvoice}
               onPrintKOT={printKOT}
+              whatsappNumber={config?.whatsappNumber}
+              hotelName={config?.name}
             />
           ))}
         </div>
@@ -203,12 +220,14 @@ export function OrdersPanel({ onNavigate }: { onNavigate?: (tab: string) => void
   )
 }
 
-const OrderCard = memo(function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKOT }: {
+const OrderCard = memo(function OrderCard({ order, onStatus, onNavigate, onCreateFoodInvoice, onPrintKOT, whatsappNumber, hotelName }: {
   order: FoodOrder
   onStatus: (o: FoodOrder, s: string) => void
   onNavigate?: (t: string) => void
   onCreateFoodInvoice?: (o: FoodOrder) => void
   onPrintKOT?: (o: FoodOrder) => void
+  whatsappNumber?: string | null
+  hotelName?: string | null
 }) {
   const statusCfg: Record<string, { cls: string; icon: React.ReactNode }> = {
     pending:   { cls: 'bg-amber-100 text-amber-800 border-amber-200', icon: <Clock className="h-3 w-3" /> },
@@ -219,6 +238,22 @@ const OrderCard = memo(function OrderCard({ order, onStatus, onNavigate, onCreat
   }
   const cfg = statusCfg[order.status] ?? statusCfg.pending
   const currentIdx = STATUS_FLOW.indexOf(order.status as any)
+
+  // Build WhatsApp link for this order
+  const waLink = buildWhatsAppLink({
+    whatsappNumber,
+    hotelName: hotelName || undefined,
+    order: {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      roomNumber: order.roomNumber,
+      orderType: order.orderType,
+      items: order.items.map(it => ({ name: it.name, quantity: it.quantity, price: it.price })),
+      itemsTotal: order.itemsTotal,
+      grandTotal: order.grandTotal,
+      notes: order.notes,
+    },
+  })
 
   return (
     <Card className="flex flex-col">
@@ -265,6 +300,17 @@ const OrderCard = memo(function OrderCard({ order, onStatus, onNavigate, onCreat
         <div className="mt-3 pt-3 border-t flex items-center justify-between">
           <span className="text-sm font-semibold">{formatINR(order.grandTotal)}</span>
           <div className="flex items-center gap-1">
+            {/* WhatsApp button — opens wa.me with order details pre-filled */}
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={whatsappNumber ? `Send order to WhatsApp (${whatsappNumber})` : 'Send order to WhatsApp'}
+            >
+              <Button size="sm" variant="ghost" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                <MessageCircle className="h-3.5 w-3.5" />
+              </Button>
+            </a>
             {/* KOT print button — for kitchen only, no prices */}
             <Button size="sm" variant="ghost" onClick={() => onPrintKOT?.(order)} title="Print Kitchen Order Ticket (KOT)">
               <ChefHat className="h-3.5 w-3.5" />
