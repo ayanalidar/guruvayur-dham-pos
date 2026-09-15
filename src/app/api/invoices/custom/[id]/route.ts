@@ -39,6 +39,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Date fields
   if (body.checkInDate != null) data.checkInDate = body.checkInDate ? new Date(body.checkInDate) : null
   if (body.checkOutDate != null) data.checkOutDate = body.checkOutDate ? new Date(body.checkOutDate) : null
+  // Invoice issue date (createdAt) — editable so staff can backdate invoices to the actual transaction date
+  if (body.createdAt != null) data.createdAt = body.createdAt ? new Date(body.createdAt) : new Date()
 
   // Items (JSON field) — sanitize each item
   let itemsChanged = false

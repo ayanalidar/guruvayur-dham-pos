@@ -133,3 +133,32 @@ Stage Summary:
 - Server-side recompute ensures data consistency on every PATCH
 - Invoice header now shows the invoice's actual date, not today's date
 - Production is live and verified end-to-end
+
+---
+Task ID: custom-invoice-editable-date-2026-09-15
+Agent: main
+Task: Make the invoice issue date (createdAt) editable in Custom Invoices (no other changes)
+
+Work Log:
+- Audit confirmed `createdAt` was the only non-editable field on custom invoices
+  (check-in/check-out dates were already editable; only the invoice issue date was locked)
+- Frontend src/components/pos/invoices-panel.tsx (CustomInvoiceDialog):
+  * Added `createdAt` to the form state init (sliced to YYYY-MM-DD for input[type=date])
+  * Added `createdAt` to the `safeForm` fallback so it's always defined
+  * Updated InvoiceHeader `date` prop to use `safeForm.createdAt` when in edit mode
+    (falls back to `invoice.createdAt` in view mode, which Object.assign updates after save)
+  * Added a new "Invoice Date" <Input type="date"> field in the edit-mode customer grid,
+    placed right next to "Invoice No." for visibility
+- Backend src/app/api/invoices/custom/[id]/route.ts (PATCH):
+  * Added `createdAt` handling alongside the existing checkInDate/checkOutDate block:
+    `if (body.createdAt != null) data.createdAt = body.createdAt ? new Date(body.createdAt) : new Date()`
+  * Empty string clears to current timestamp (defensive default — never null)
+- No other code touched. Hotel invoices, food invoices, KOT, rooms, kitchen, reports, etc.
+  remain exactly as before.
+
+Stage Summary:
+- Custom invoice issue date is now editable via a date picker in the edit dialog
+- The change is reflected in the InvoiceHeader immediately (live preview while editing)
+- After save, the PATCH response flows back via Object.assign so the view-mode display
+  and the printed invoice both show the new date
+- Pattern mirrors the existing checkInDate/checkOutDate handling for consistency

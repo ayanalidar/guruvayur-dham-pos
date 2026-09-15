@@ -1832,6 +1832,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
         roomTypes: parseRoomTypes(invoice.roomType),
         checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 10) : '',
         checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 10) : '',
+        createdAt: invoice.createdAt ? invoice.createdAt.slice(0, 10) : '',
         items: (invoice.items || []).map((it: any) => ({ ...it })),
         itemsTotal: invoice.itemsTotal,
         cgstRate: invoice.cgstRate,
@@ -1964,6 +1965,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
     igstRate: invoice.igstRate || 0, cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount,
     igstAmount: invoice.igstAmount || 0, grandTotal: invoice.grandTotal, discount: invoice.discount,
     paymentMethod: invoice.paymentMethod || '', notes: invoice.notes || '',
+    createdAt: invoice.createdAt ? invoice.createdAt.slice(0, 10) : '',
   }
 
   const items: any[] = editMode ? (safeForm.items || []) : (invoice.items as any[] || [])
@@ -1998,7 +2000,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
 
         <div className="flex-1 overflow-y-auto">
         <div className="invoice-print bg-white p-6 mx-auto" style={{ maxWidth: '800px', overflowWrap: 'break-word', wordWrap: 'break-word' }}>
-          <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" date={invoice.createdAt} />
+          <InvoiceHeader config={config} invoiceNumber={editMode ? safeForm.invoiceNumber : invoice.invoiceNumber} title="INVOICE" copyNote="Original" date={editMode && safeForm.createdAt ? safeForm.createdAt : invoice.createdAt} />
 
           {/* Customer details — same format as hotel invoice */}
           {editMode && form ? (
@@ -2024,6 +2026,7 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
             </div>
             <div className="inv-customer grid grid-cols-2 gap-2 text-xs">
               <Field label="Invoice No."><Input value={form.invoiceNumber} onChange={e => setForm({ ...form, invoiceNumber: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Invoice Date"><Input type="date" value={form.createdAt || ''} onChange={e => setForm({ ...form, createdAt: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Customer Name"><Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Phone"><Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="GSTIN"><Input value={form.customerGstIn} onChange={e => setForm({ ...form, customerGstIn: e.target.value })} className="h-7 text-xs" /></Field>
