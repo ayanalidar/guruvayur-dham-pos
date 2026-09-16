@@ -162,3 +162,34 @@ Stage Summary:
 - After save, the PATCH response flows back via Object.assign so the view-mode display
   and the printed invoice both show the new date
 - Pattern mirrors the existing checkInDate/checkOutDate handling for consistency
+
+---
+Task ID: custom-invoice-create-date-2026-09-16
+Agent: main
+Task: Add "Invoice Date" field to the New Custom Invoice dialog (so staff can set the date while filling in customer details, instead of creating first then editing)
+
+Work Log:
+- Frontend src/components/pos/invoices-panel.tsx (CustomInvoiceCreateDialog):
+  * Added `invoiceDate: ''` to initial form state and the reset-on-open call
+  * Reorganized the customer details grid:
+    - Row 1: Invoice Number | Invoice Date  (new field)
+    - Row 2: Customer Name | Phone
+    - Row 3: GSTIN | Address  (Address moved up from its own full-width row)
+  * Added a new <Input type="date"> labeled "Invoice Date (leave blank for today)"
+    next to "Invoice Number (leave blank for auto)"
+  * Included `createdAt: form.invoiceDate || undefined` in the POST body sent to
+    /api/invoices/custom — undefined makes Prisma fall back to schema @default(now())
+- Backend src/app/api/invoices/custom/route.ts (POST):
+  * Destructured `createdAt` from the request body alongside the other fields
+  * In db.customInvoice.create(), conditionally spread createdAt:
+    `...(createdAt ? { createdAt: new Date(createdAt) } : {})`
+  * When omitted, Prisma's @default(now()) handles it — fully backward-compatible
+- No other code touched. Edit dialog, hotel/food invoices, KOT, rooms, kitchen,
+  reports, etc. remain exactly as before.
+
+Stage Summary:
+- Staff can now set the invoice issue date at creation time — no need to save
+  first then re-open and edit
+- Field placement matches the edit dialog (Invoice No. + Invoice Date side-by-side)
+- Blank field = today's date (same behavior as before, no breaking change)
+- New layout is slightly more compact: 3 rows of 2 fields instead of 3 rows + 1 full-width

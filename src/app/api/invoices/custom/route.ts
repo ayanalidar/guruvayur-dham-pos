@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     customerName, customerPhone, customerAddress, customerGstIn,
     roomType,
     checkInDate, checkOutDate,
+    createdAt,
     items, discount, cgstRate, sgstRate, igstRate,
     paymentMethod, notes, customInvoiceNumber,
   } = body
@@ -85,6 +86,9 @@ export async function POST(req: NextRequest) {
       roomType: roomType ? String(roomType).trim().slice(0, 50) : null,
       checkInDate: checkInDate ? new Date(checkInDate) : null,
       checkOutDate: checkOutDate ? new Date(checkOutDate) : null,
+      // Allow setting a custom invoice date at creation time (e.g., backdating to actual transaction date).
+      // When omitted (undefined), Prisma falls back to schema default @default(now()).
+      ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
       items: safeItems,
       itemsTotal,
       cgstRate: cRate,

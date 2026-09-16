@@ -1475,7 +1475,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
   const [form, setForm] = useState<any>({
     customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '',
     roomTypes: [] as string[],
-    customInvoiceNumber: '', checkInDate: '', checkOutDate: '',
+    customInvoiceNumber: '', invoiceDate: '', checkInDate: '', checkOutDate: '',
     cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '',
   })
   const [items, setItems] = useState<{ name: string; quantity: number; rate: number; __roomLine?: boolean; __roomType?: string }[]>([
@@ -1490,7 +1490,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         setConfig(d.config)
         setForm((f: any) => ({ ...f, cgstRate: d.config?.cgstRate ?? 9, sgstRate: d.config?.sgstRate ?? 9, igstRate: d.config?.igstRate ?? 0 }))
       }).catch(() => {})
-      setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', roomTypes: [], customInvoiceNumber: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
+      setForm({ customerName: '', customerPhone: '', customerAddress: '', customerGstIn: '', roomTypes: [], customInvoiceNumber: '', invoiceDate: '', checkInDate: '', checkOutDate: '', cgstRate: 0, sgstRate: 0, igstRate: 0, discount: 0, paymentMethod: 'Cash', notes: '' })
       setItems([{ name: '', quantity: 1, rate: 0 }])
       setSelectedCustomerId(null)
       setSaveAsNewCustomer(false)
@@ -1576,6 +1576,7 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
         method: 'POST',
         body: JSON.stringify({
           ...form,
+          createdAt: form.invoiceDate || undefined,
           roomType: joinRoomTypes(form.roomTypes) || undefined,
           items: validItems,
         }),
@@ -1672,26 +1673,31 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
             </p>
           )}
 
-          {/* Invoice number + Customer details */}
+          {/* Invoice number + Invoice date */}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Invoice Number (leave blank for auto)">
               <Input value={form.customInvoiceNumber || ''} onChange={e => setForm({ ...form, customInvoiceNumber: e.target.value })} placeholder="Auto: 1, 2, 3..." />
             </Field>
-            <Field label="Customer Name *">
-              <Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} placeholder="Name / Company" />
+            <Field label="Invoice Date (leave blank for today)">
+              <Input type="date" value={form.invoiceDate || ''} onChange={e => setForm({ ...form, invoiceDate: e.target.value })} className="h-8 text-xs" />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Customer Name *">
+              <Input value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} placeholder="Name / Company" />
+            </Field>
             <Field label="Phone (optional)">
               <Input value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} placeholder="+91 ..." />
             </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="GSTIN (B2B billing)">
               <Input value={form.customerGstIn || ''} onChange={e => setForm({ ...form, customerGstIn: e.target.value })} placeholder="22AAAAA0000A1Z5" />
             </Field>
+            <Field label="Address (optional)">
+              <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
+            </Field>
           </div>
-          <Field label="Address (optional)">
-            <Input value={form.customerAddress} onChange={e => setForm({ ...form, customerAddress: e.target.value })} />
-          </Field>
 
           {/* Room Types — multi-select checkboxes */}
           <Field label="Room Types (check all that apply — multiple rooms supported)">
