@@ -193,3 +193,45 @@ Stage Summary:
 - Field placement matches the edit dialog (Invoice No. + Invoice Date side-by-side)
 - Blank field = today's date (same behavior as before, no breaking change)
 - New layout is slightly more compact: 3 rows of 2 fields instead of 3 rows + 1 full-width
+
+---
+Task ID: custom-invoice-checkin-time-2026-09-16
+Agent: main
+Task: Add timestamp (date + time) support to Custom Invoice check-in/check-out fields
+
+Work Log:
+- Audit confirmed the DB column type (DateTime) already supports time, but the UI
+  chain stripped it: <Input type="date"> + .slice(0, 10) on the form-state init.
+  Hotel Invoice already uses <Input type="datetime-local"> + formatDateShort + formatTime
+  columns — we mirrored that exact pattern.
+- Frontend src/components/pos/invoices-panel.tsx (5 edits, all inside Custom Invoice flows):
+  * Create dialog (CustomInvoiceCreateDialog):
+    - Check-in/Check-out inputs changed type="date" -> type="datetime-local"
+    - Labels simplified: "Check-in Date" -> "Check-in", "Check-out Date" -> "Check-out"
+  * Edit dialog form state init (CustomInvoiceDialog):
+    - .slice(0, 10) -> .slice(0, 16) so the time portion is preserved when populating
+      the form from the invoice's stored ISO timestamp (YYYY-MM-DDTHH:mm format)
+  * Edit dialog safeForm fallback:
+    - Same .slice(0, 16) conversion added so the fallback also keeps the time
+  * Edit dialog inputs:
+    - type="date" -> type="datetime-local" + label simplification (same as create dialog)
+  * Non-edit display + print layout (LeaderRow):
+    - Added two new "Time" LeaderField columns alongside "A/D Date" and "D/I Date"
+      using the existing formatTime() helper (already imported at line 16)
+    - Layout now matches Hotel Invoice: Date | Time | Date | Time | Nights
+- No backend changes needed:
+  * Prisma DateTime accepts datetime-local strings natively
+  * new Date("YYYY-MM-DDTHH:mm") is a valid Date with time preserved
+  * The nights calculation (Math.ceil(... / 86400000)) still works correctly with
+    sub-day intervals — e.g., 2pm check-in → 10am next day = 20h = 0.83 days → ceil = 1 night
+- No other code touched. Hotel invoices, food invoices, KOT, rooms, kitchen, reports,
+  the InvoiceHeader component, etc. remain exactly as before.
+
+Stage Summary:
+- Custom invoices now capture full check-in/check-out timestamps (date + time)
+- Printed invoice shows Date and Time as separate columns (matches hotel invoice layout)
+- Edit dialog preserves the time portion when re-opening an invoice
+- Backward-compatible: existing invoices had midnight (00:00) timestamps stored,
+  so the new Time column will display "12:00 AM" for them — acceptable, can add
+  a conditional hide for midnight times later if requested
+- Same UX as hotel invoices — staff training cost is zero

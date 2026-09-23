@@ -1711,11 +1711,11 @@ function CustomInvoiceCreateDialog({ open, onOpenChange, onDone }: {
 
           {/* Check-in/out + Nights */}
           <div className="grid grid-cols-3 gap-3">
-            <Field label="Check-in Date">
-              <Input type="date" value={form.checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-8 text-xs" />
+            <Field label="Check-in">
+              <Input type="datetime-local" value={form.checkInDate || ''} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-8 text-xs" />
             </Field>
-            <Field label="Check-out Date">
-              <Input type="date" value={form.checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-8 text-xs" />
+            <Field label="Check-out">
+              <Input type="datetime-local" value={form.checkOutDate || ''} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-8 text-xs" />
             </Field>
             <Field label="Nights (auto)">
               <Input type="number" value={nights || ''} readOnly className="bg-muted/50 h-8 text-xs" placeholder="—" />
@@ -1836,8 +1836,8 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
         customerAddress: invoice.customerAddress || '',
         customerGstIn: invoice.customerGstIn || '',
         roomTypes: parseRoomTypes(invoice.roomType),
-        checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 10) : '',
-        checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 10) : '',
+        checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 16) : '',
+        checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 16) : '',
         createdAt: invoice.createdAt ? invoice.createdAt.slice(0, 10) : '',
         items: (invoice.items || []).map((it: any) => ({ ...it })),
         itemsTotal: invoice.itemsTotal,
@@ -1965,8 +1965,8 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
     invoiceNumber: invoice.invoiceNumber, customerName: invoice.customerName,
     customerPhone: invoice.customerPhone || '', customerAddress: invoice.customerAddress || '',
     customerGstIn: invoice.customerGstIn || '', roomTypes: parseRoomTypes(invoice.roomType),
-    checkInDate: invoice.checkInDate || '',
-    checkOutDate: invoice.checkOutDate || '', items: invoice.items || [],
+    checkInDate: invoice.checkInDate ? invoice.checkInDate.slice(0, 16) : '',
+    checkOutDate: invoice.checkOutDate ? invoice.checkOutDate.slice(0, 16) : '', items: invoice.items || [],
     itemsTotal: invoice.itemsTotal, cgstRate: invoice.cgstRate, sgstRate: invoice.sgstRate,
     igstRate: invoice.igstRate || 0, cgstAmount: invoice.cgstAmount, sgstAmount: invoice.sgstAmount,
     igstAmount: invoice.igstAmount || 0, grandTotal: invoice.grandTotal, discount: invoice.discount,
@@ -2046,8 +2046,8 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                   <option value="Mixed">Mixed</option>
                 </select>
               </Field>
-              <Field label="Check-in Date"><Input type="date" value={form.checkInDate} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-7 text-xs" /></Field>
-              <Field label="Check-out Date"><Input type="date" value={form.checkOutDate} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Check-in"><Input type="datetime-local" value={form.checkInDate} onChange={e => setForm({ ...form, checkInDate: e.target.value })} className="h-7 text-xs" /></Field>
+              <Field label="Check-out"><Input type="datetime-local" value={form.checkOutDate} onChange={e => setForm({ ...form, checkOutDate: e.target.value })} className="h-7 text-xs" /></Field>
               <Field label="Discount (₹)"><Input type="number" value={form.discount} onChange={e => setForm(recompute({ ...form, discount: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="CGST %"><Input type="number" step="0.1" value={form.cgstRate} onChange={e => setForm(recompute({ ...form, cgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
               <Field label="SGST %"><Input type="number" step="0.1" value={form.sgstRate} onChange={e => setForm(recompute({ ...form, sgstRate: Number(e.target.value) }))} className="h-7 text-xs" /></Field>
@@ -2078,7 +2078,9 @@ function CustomInvoiceDialog({ invoice, onClose }: { invoice: CustomInvoice | nu
                   {ciDate && coDate && (
                     <>
                       <LeaderField label="A/D Date" value={formatDateShort(ciDate)} width="w-40" />
+                      <LeaderField label="Time" value={formatTime(ciDate)} width="w-32" />
                       <LeaderField label="D/I Date" value={formatDateShort(coDate)} width="w-40" />
+                      <LeaderField label="Time" value={formatTime(coDate)} width="w-32" />
                       {nights > 0 && <LeaderField label="Nights" value={String(nights)} width="w-24" />}
                     </>
                   )}
